@@ -2,12 +2,17 @@ const NUM_OF_BITS = 8;
 var number1, number2;
 var andGate;
 var logicGates = [];
+
+var contextMenu; // Create a variable for the ContextMenu
+var menuOptions = ["and", "or", "not"];
 function setup() {
   let canvas = createCanvas(600, 600);
   canvas.elt.oncontextmenu = () => false;
   number1 = new BinaryDisplay(134, 30, 40 + 15);
   number2 = new BinaryDisplay(1, 30, height / 2 + 20 + 15);
   andGate = new LogicGate(width / 2, height / 2, "or");
+
+  contextMenu = new ContextMenu(menuOptions);
 }
 
 function draw() {
@@ -19,11 +24,33 @@ function draw() {
   number2.update();
 
   andGate.show();
+  for (let logicGate of logicGates) {
+    logicGate.show();
+  }
+  contextMenu.draw();
 }
 
 function mousePressed() {
   if (mouseButton === RIGHT) {
-    console.log("Right click detected!");
+    contextMenu.show(mouseX, mouseY);
+  }
+}
+
+function mouseReleased() {
+  let contextData = contextMenu.handleClick(mouseX, mouseY);
+  console.log(contextData)
+  if (contextData) {
+    switch (contextData.i) {
+      case 0:
+        logicGates.push(new LogicGate(contextData.x, contextData.y, "and"));
+        break;
+      case 1:
+        logicGates.push(new LogicGate(contextData.x, contextData.y, "or"));
+        break;
+      case 2:
+        logicGates.push(new LogicGate(contextData.x, contextData.y, "not"));
+        break;
+    }
   }
 }
 
