@@ -31,6 +31,6 @@ class Line {
     }
 
     strokeWeight(3);
-    line(this.start.x, this.start.y, this.endYSupplier(), this.endYSupplier());
+    line(this.start.x, this.start.y, this.endXSupplier(), this.endYSupplier());
   }
 }

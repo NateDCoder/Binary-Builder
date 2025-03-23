@@ -1,6 +1,6 @@
-function drawAndGate(x, y, w, h) {
+function drawAndGate(x, y, w, h, input) {
     // Draw the rectangle part (left side)
-    fill(100);
+    input ? fill(255, 255, 0) : fill(100);
     noStroke();
     strokeWeight(2);
     rect(x - w / 2, y - h / 2, w / 2, h);
@@ -8,8 +8,8 @@ function drawAndGate(x, y, w, h) {
     arc(x, y, h, h, -HALF_PI, HALF_PI);
   }
   
-  function drawOrGate(posX, posY, sizeX, sizeY) {
-    fill(100);
+  function drawOrGate(posX, posY, sizeX, sizeY, input) {
+    input ? fill(255, 255, 0) : fill(100);
     noStroke();
   
     beginShape();
@@ -48,8 +48,8 @@ function drawAndGate(x, y, w, h) {
     endShape(CLOSE);
   }
   
-  function drawNotGate(x, y, w, h) {
-    fill(100);
+  function drawNotGate(x, y, w, h, input) {
+    input ?  fill(100) : fill(255, 255, 0);
     noStroke();
   
     // Draw triangle for NOT gate
@@ -59,7 +59,7 @@ function drawAndGate(x, y, w, h) {
     vertex(x + w / 2, y);
     endShape(CLOSE);
   
-    fill(255, 255, 0);
+    input ? fill(255, 255, 0) : fill(100);
     // Draw small circle at the tip (inverter)
-    circle(x + w / 2 + 7, y, 8);
+    circle(x + w / 2 + 3, y, 8);
   }
