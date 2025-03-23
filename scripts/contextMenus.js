@@ -60,10 +60,11 @@ class ContextMenu {
         y > this.menuY + yOffset &&
         y < this.menuY + yOffset + this.height
       ) {
-        this.hide(); // Hide the menu after selection
+        this.hide();
         return { x: this.menuX, y: this.menuY, i: i };
       }
     }
+    this.hide(); // Hide the menu after selection
     return;
   }
 
