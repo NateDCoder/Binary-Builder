@@ -3,19 +3,18 @@ class BinaryDisplay {
     this.binary = dec2Bin(number);
     this.position = createVector(startX, startY);
     this.SCALE = 30;
+    this.rectXStart = this.position.x - this.SCALE / 2;
+    this.rectYStarts = [];
+    for (let i = 0; i < NUM_OF_BITS; i++) {
+      this.rectYStarts.push(this.position.y - this.SCALE / 2 + i * this.SCALE);
+    }
   }
   show() {
     stroke(80);
     strokeWeight(2);
+    fill(46);
     for (let i = 0; i < NUM_OF_BITS; i++) {
-      fill(46);
-      rect(
-        this.position.x - this.SCALE / 2,
-        this.position.y - this.SCALE / 2 + i * this.SCALE,
-        this.SCALE,
-        this.SCALE,
-        10
-      );
+      rect(this.rectXStart, this.rectYStarts[i], this.SCALE, this.SCALE, 10);
     }
 
     textSize(20);
@@ -26,67 +25,61 @@ class BinaryDisplay {
       text(this.binary[i], this.position.x, i * this.SCALE + this.position.y);
     }
   }
-  update() {
+  update(x, y) {
     if (
-      isPointInRect(
-        mouseX,
-        mouseY,
-        this.position.x - this.SCALE / 2,
-        this.position.y - this.SCALE / 2,
+      !isPointInRect(
+        x,
+        y,
+        this.rectXStart,
+        this.rectYStarts[0],
         this.SCALE,
         this.SCALE * 8
       )
-    ) {
-      fill(255);
-      text(bin2Dec(this.binary), this.position.x, this.position.y - this.SCALE);
-    }
+    )
+      return;
+    fill(255);
+    text(bin2Dec(this.binary), this.position.x, this.position.y - this.SCALE);
   }
   intersect(mouseButton) {
-    if (mouseButton === RIGHT) {
-      for (let i = 0; i < NUM_OF_BITS; i++) {
-        if (
-          isPointInRect(
-            mouseX,
-            mouseY,
-            this.position.x - this.SCALE / 2,
-            this.position.y - this.SCALE / 2 + i * this.SCALE,
-            this.SCALE,
-            this.SCALE
-          )
-        ) {
-          console.log(i);
-          sampleLine = new SampleLine(
-            () => this.position.x + this.SCALE / 2,
-            () => this.position.y + i * this.SCALE,
-            () => int(this.binary[i]) == 1
-          );
-          return true;
+    for (let i = 0; i < NUM_OF_BITS; i++) {
+      if (this.isMouseOverBit(i)) {
+        if (mouseButton === RIGHT) {
+          this.handleRightClick(i);
+        } else {
+          this.toggleBit(i);
         }
+        return true;
       }
-      return false;
-    } else {
-      for (let i = 0; i < NUM_OF_BITS; i++) {
-        if (
-          isPointInRect(
-            mouseX,
-            mouseY,
-            this.position.x - this.SCALE / 2,
-            this.position.y - this.SCALE / 2 + i * this.SCALE,
-            this.SCALE,
-            this.SCALE
-          )
-        ) {
-          console.log(i);
-          this.binary = replaceBit(
-            this.binary,
-            i,
-            this.binary[i] == "1" ? "0" : "1"
-          );
-          return true;
-        }
-      }
-      return false;
     }
+    return false;
+  }
+
+  isMouseOverBit(i) {
+    return isPointInRect(
+      mouseX,
+      mouseY,
+      this.rectXStart,
+      this.rectYStarts[i],
+      this.SCALE,
+      this.SCALE
+    );
+  }
+
+  handleRightClick(i) {
+    console.log(i);
+    sampleLine = new SampleLine(
+      () => this.position.x + this.SCALE / 2, // X Position Supplier
+      () => this.position.y + i * this.SCALE, // Y Position Supplier
+      () => int(this.binary[i]) == 1 // Binary state check
+    );
+  }
+
+  toggleBit(i) {
+    this.binary = replaceBit(
+      this.binary,
+      i,
+      this.binary[i] === "1" ? "0" : "1"
+    );
   }
 }
 
@@ -117,19 +110,10 @@ class OutputBinaryDisplay extends BinaryDisplay {
 
   intersect() {
     for (let i = 0; i < NUM_OF_BITS; i++) {
-      if (
-        isPointInRect(
-          mouseX,
-          mouseY,
-          this.position.x - this.SCALE / 2,
-          this.position.y - this.SCALE / 2 + i * this.SCALE,
-          this.SCALE,
-          this.SCALE
-        )
-      ) {
+      if (this.isMouseOverBit(i)) {
         this.intersectedBit = i;
         this.endPoint = createVector(
-          this.position.x - this.SCALE / 2,
+          this.rectXStart,
           this.position.y + i * this.SCALE
         );
         return true;
@@ -138,4 +122,3 @@ class OutputBinaryDisplay extends BinaryDisplay {
     return false;
   }
 }
-

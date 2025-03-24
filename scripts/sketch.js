@@ -3,7 +3,7 @@ var number1, number2, output;
 var logicGates = [];
 var lines = [];
 var contextMenu; // Create a variable for the ContextMenu
-var menuOptions = ["and", "or", "not", "xor"];
+const menuOptions = ["and", "or", "not", "xor"];
 
 var sampleLine = null;
 function setup() {
@@ -20,10 +20,10 @@ function setup() {
 function draw() {
   background(0);
   number1.show();
-  number1.update();
+  number1.update(mouseX, mouseY);
 
   number2.show();
-  number2.update();
+  number2.update(mouseX, mouseY);
 
   output.show();
   output.update();
@@ -64,80 +64,72 @@ function mousePressed() {
     contextMenu.show(mouseX, mouseY);
   }
 }
-
-function mouseReleased() {
+function handleContextWindow() {
+  let contextData = contextMenu.handleClick(mouseX, mouseY);
+  console.log(contextData);
+  if (contextData)
+    logicGates.push(
+      new LogicGate(contextData.x, contextData.y, menuOptions[contextData.i])
+    );
+}
+function turnOffDraggable() {
   for (let logicGate of logicGates) {
     logicGate.draggable = false;
   }
-  let contextData = contextMenu.handleClick(mouseX, mouseY);
-  console.log(contextData);
-  if (contextData) {
-    switch (contextData.i) {
-      case 0:
-        logicGates.push(new LogicGate(contextData.x, contextData.y, "and"));
-        break;
-      case 1:
-        logicGates.push(new LogicGate(contextData.x, contextData.y, "or"));
-        break;
-      case 2:
-        logicGates.push(new LogicGate(contextData.x, contextData.y, "not"));
-        break;
-      case 3:
-        logicGates.push(new LogicGate(contextData.x, contextData.y, "xor"));
-        break;
-    }
-  }
-  if (sampleLine) {
-    for (let i = 0; i < logicGates.length; i++) {
-      if (logicGates[i].intersect(mouseX, mouseY)) {
-        let my = mouseY;
-        let lgY = logicGates[i].position.y;
-        lines.push(
-          new Line(
-            sampleLine.startXSupplier,
-            sampleLine.startYSupplier,
-            () => logicGates[i].position.x - 25,
-            () =>
-              logicGates[i].type !== "not"
-                ? my - lgY < 0
-                  ? logicGates[i].position.y - 8
-                  : logicGates[i].position.y + 8
-                : logicGates[i].position.y,
-            sampleLine.inputSupllier,
-            sampleLine.logicGate
-          )
-        );
-        logicGates[i].assignInput(
-          sampleLine.inputSupllier,
-          mouseY,
-          lines[lines.length - 1]
-        );
-      }
-    }
-    if (output.intersect()) {
-      console.log(sampleLine);
-      console.log(sampleLine.inputSupllier());
-      let endPoint = createVector(output.endPoint.x, output.endPoint.y);
+}
+function mouseReleased() {
+  turnOffDraggable();
+  handleContextWindow();
+  if (!sampleLine) return;
+
+  for (let i = 0; i < logicGates.length; i++) {
+    if (logicGates[i].intersect(mouseX, mouseY)) {
+      let my = mouseY;
+      let lgY = logicGates[i].position.y;
       lines.push(
         new Line(
           sampleLine.startXSupplier,
           sampleLine.startYSupplier,
-          () => endPoint.x,
-          () => endPoint.y,
-          sampleLine.inputSupllier
+          () => logicGates[i].position.x - 25,
+          () =>
+            logicGates[i].type !== "not"
+              ? my - lgY < 0
+                ? logicGates[i].position.y - 8
+                : logicGates[i].position.y + 8
+              : logicGates[i].position.y,
+          sampleLine.inputSupllier,
+          sampleLine.logicGate
         )
       );
-
-      if (output.inputLines[output.intersectedBit]) {
-        lines = lines.filter(
-          (line) => line !== output.inputLines[output.intersectedBit]
-        );
-      }
-      output.inputLines[output.intersectedBit] = lines[lines.length - 1];
-
-      output.bitSuppliers[output.intersectedBit] = sampleLine.inputSupllier;
+      logicGates[i].assignInput(
+        sampleLine.inputSupllier,
+        mouseY,
+        lines[lines.length - 1]
+      );
     }
   }
+  if (output.intersect()) {
+    let endPoint = createVector(output.endPoint.x, output.endPoint.y);
+    lines.push(
+      new Line(
+        sampleLine.startXSupplier,
+        sampleLine.startYSupplier,
+        () => endPoint.x,
+        () => endPoint.y,
+        sampleLine.inputSupllier
+      )
+    );
+
+    if (output.inputLines[output.intersectedBit]) {
+      lines = lines.filter(
+        (line) => line !== output.inputLines[output.intersectedBit]
+      );
+    }
+    output.inputLines[output.intersectedBit] = lines[lines.length - 1];
+
+    output.bitSuppliers[output.intersectedBit] = sampleLine.inputSupllier;
+  }
+
   sampleLine = null;
 }
 function keyPressed() {

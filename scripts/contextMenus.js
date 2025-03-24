@@ -68,17 +68,4 @@ class ContextMenu {
     this.hide(); // Hide the menu after selection
     return;
   }
-
-  // Handle what happens when an option is clicked
-  optionSelected(index) {
-    console.log(`You clicked: ${this.options[index]}`);
-    // You can define custom behavior for each option here
-    if (index === 0) {
-      alert("You selected Option 1!");
-    } else if (index === 1) {
-      alert("You selected Option 2!");
-    } else if (index === 2) {
-      alert("You selected Option 3!");
-    }
-  }
 }
