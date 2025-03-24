@@ -43,18 +43,17 @@ function draw() {
 
 function mousePressed() {
   let intersect = false;
-  for (let i = 0; i < logicGates.length; i++) {
-    if (logicGates[i].intersect(mouseX, mouseY)) {
+  for (let logicGate of logicGates) {
+    if (logicGate.intersect(mouseX, mouseY)) {
       intersect = true;
       if (mouseButton === RIGHT) {
         sampleLine = new SampleLine(
-          () => logicGates[i].position.x + 15,
-          () => logicGates[i].position.y,
-          () => logicGates[i].output(),
-          logicGates[i]
+          () => logicGate.position.x + 15,
+          () => logicGate.position.y,
+          () => logicGate.output()
         );
       } else {
-        logicGates[i].draggable = true;
+        logicGate.draggable = true;
       }
     }
   }
@@ -82,26 +81,25 @@ function mouseReleased() {
   handleContextWindow();
   if (!sampleLine) return;
 
-  for (let i = 0; i < logicGates.length; i++) {
-    if (logicGates[i].intersect(mouseX, mouseY)) {
+  for (let logicGate of logicGates) {
+    if (logicGate.intersect(mouseX, mouseY)) {
       let my = mouseY;
-      let lgY = logicGates[i].position.y;
+      let lgY = logicGate.position.y;
       lines.push(
         new Line(
           sampleLine.startXSupplier,
           sampleLine.startYSupplier,
-          () => logicGates[i].position.x - 25,
+          () => logicGate.position.x - 25,
           () =>
-            logicGates[i].type !== "not"
+            logicGate.type !== "not"
               ? my - lgY < 0
-                ? logicGates[i].position.y - 8
-                : logicGates[i].position.y + 8
-              : logicGates[i].position.y,
-          sampleLine.inputSupllier,
-          sampleLine.logicGate
+                ? logicGate.position.y - 8
+                : logicGate.position.y + 8
+              : logicGate.position.y,
+          sampleLine.inputSupllier
         )
       );
-      logicGates[i].assignInput(
+      logicGate.assignInput(
         sampleLine.inputSupllier,
         mouseY,
         lines[lines.length - 1]
@@ -141,12 +139,6 @@ function keyPressed() {
         }
         if (logicGates[i].inputBLine) {
           lines = lines.filter((line) => line !== logicGates[i].inputBLine);
-        }
-        for (let j = 0; j < lines.length; j++) {
-          if (lines[j].logicGate === logicGates[i]) {
-            lines.splice(j, 1);
-            j--;
-          }
         }
         logicGates.splice(i, 1); // Remove the element at index i
         i--; // Adjust the index after removal to prevent skipping elements

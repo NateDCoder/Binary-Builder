@@ -1,9 +1,8 @@
 class SampleLine {
-  constructor(startXSupplier, startYSupplier, inputSupllier, logicGate = null) {
+  constructor(startXSupplier, startYSupplier, inputSupllier) {
     this.startXSupplier = startXSupplier;
     this.startYSupplier = startYSupplier;
     this.inputSupllier = inputSupllier;
-    this.logicGate = logicGate;
   }
 
   show() {
@@ -23,15 +22,13 @@ class Line {
     startYSupplier,
     endXSupplier,
     endYSupplier,
-    inputSupllier,
-    logicGate = null
+    inputSupllier
   ) {
     this.startXSupplier = startXSupplier;
     this.startYSupplier = startYSupplier;
     this.endXSupplier = endXSupplier;
     this.endYSupplier = endYSupplier;
     this.inputSupllier = inputSupllier;
-    this.logicGate = logicGate;
   }
 
   show() {
