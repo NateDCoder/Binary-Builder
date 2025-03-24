@@ -3,14 +3,14 @@ var number1, number2, output;
 var logicGates = [];
 var lines = [];
 var contextMenu; // Create a variable for the ContextMenu
-var menuOptions = ["and", "or", "not"];
+var menuOptions = ["and", "or", "not", "xor"];
 
 var sampleLine = null;
 function setup() {
   let canvas = createCanvas(600, 600);
   canvas.elt.oncontextmenu = () => false;
-  number1 = new BinaryDisplay(0, 30, 40 + 15);
-  number2 = new BinaryDisplay(0, 30, height / 2 + 20 + 15);
+  number1 = new BinaryDisplay(1, 30, 40 + 15);
+  number2 = new BinaryDisplay(1, 30, height / 2 + 20 + 15);
 
   output = new outputBinaryDisplay(width - 30, height / 2 - 30 * 4);
 
@@ -48,18 +48,18 @@ function mousePressed() {
       intersect = true;
       if (mouseButton === RIGHT) {
         sampleLine = new SampleLine(
-          logicGates[i].position.x + 15,
-          logicGates[i].position.y,
-          () => logicGates[i].output()
+          () => logicGates[i].position.x + 15,
+          () => logicGates[i].position.y,
+          () => logicGates[i].output(),
+          logicGates[i]
         );
       } else {
         logicGates[i].draggable = true;
       }
     }
   }
-  if (mouseButton === RIGHT && !intersect) {
-    if (number1.intersect() || number2.intersect()) return;
-  }
+  if (number1.intersect(mouseButton) || number2.intersect(mouseButton)) return;
+
   if (mouseButton === RIGHT && !intersect) {
     contextMenu.show(mouseX, mouseY);
   }
@@ -82,6 +82,9 @@ function mouseReleased() {
       case 2:
         logicGates.push(new LogicGate(contextData.x, contextData.y, "not"));
         break;
+      case 3:
+        logicGates.push(new LogicGate(contextData.x, contextData.y, "xor"));
+        break;
     }
   }
   if (sampleLine) {
@@ -91,16 +94,17 @@ function mouseReleased() {
         let lgY = logicGates[i].position.y;
         lines.push(
           new Line(
-            sampleLine.start.x,
-            sampleLine.start.y,
+            sampleLine.startXSupplier,
+            sampleLine.startYSupplier,
             () => logicGates[i].position.x - 25,
             () =>
-              logicGates[i].type == "or" || logicGates[i].type == "and"
+              logicGates[i].type !== "not"
                 ? my - lgY < 0
                   ? logicGates[i].position.y - 8
                   : logicGates[i].position.y + 8
                 : logicGates[i].position.y,
-            sampleLine.inputSupllier
+            sampleLine.inputSupllier,
+            sampleLine.logicGate
           )
         );
         logicGates[i].assignInput(
@@ -113,11 +117,11 @@ function mouseReleased() {
     if (output.intersect()) {
       console.log(sampleLine);
       console.log(sampleLine.inputSupllier());
-      let endPoint = createVector(output.endPoint.x, output.endPoint.y)
+      let endPoint = createVector(output.endPoint.x, output.endPoint.y);
       lines.push(
         new Line(
-          sampleLine.start.x,
-          sampleLine.start.y,
+          sampleLine.startXSupplier,
+          sampleLine.startYSupplier,
           () => endPoint.x,
           () => endPoint.y,
           sampleLine.inputSupllier
@@ -125,7 +129,9 @@ function mouseReleased() {
       );
 
       if (output.inputLines[output.intersectedBit]) {
-        lines = lines.filter((line) => line !== output.inputLines[output.intersectedBit]);
+        lines = lines.filter(
+          (line) => line !== output.inputLines[output.intersectedBit]
+        );
       }
       output.inputLines[output.intersectedBit] = lines[lines.length - 1];
 
@@ -143,6 +149,12 @@ function keyPressed() {
         }
         if (logicGates[i].inputBLine) {
           lines = lines.filter((line) => line !== logicGates[i].inputBLine);
+        }
+        for (let j = 0; j < lines.length; j++) {
+          if (lines[j].logicGate === logicGates[i]) {
+            lines.splice(j, 1);
+            j--;
+          }
         }
         logicGates.splice(i, 1); // Remove the element at index i
         i--; // Adjust the index after removal to prevent skipping elements
@@ -217,28 +229,48 @@ class BinaryDisplay {
       text(bin2Dec(this.binary), this.position.x, this.position.y - this.SCALE);
     }
   }
-  intersect() {
-    for (let i = 0; i < NUM_OF_BITS; i++) {
-      if (
-        isPointInRect(
-          mouseX,
-          mouseY,
-          this.position.x - this.SCALE / 2,
-          this.position.y - this.SCALE / 2 + i * this.SCALE,
-          this.SCALE,
-          this.SCALE
-        )
-      ) {
-        console.log(i);
-        sampleLine = new SampleLine(
-          this.position.x + this.SCALE / 2,
-          this.position.y + i * this.SCALE,
-          () => int(this.binary[i]) == 1
-        );
-        return true;
+  intersect(mouseButton) {
+    if (mouseButton === RIGHT) {
+      for (let i = 0; i < NUM_OF_BITS; i++) {
+        if (
+          isPointInRect(
+            mouseX,
+            mouseY,
+            this.position.x - this.SCALE / 2,
+            this.position.y - this.SCALE / 2 + i * this.SCALE,
+            this.SCALE,
+            this.SCALE
+          )
+        ) {
+          console.log(i);
+          sampleLine = new SampleLine(
+            () => this.position.x + this.SCALE / 2,
+            () => this.position.y + i * this.SCALE,
+            () => int(this.binary[i]) == 1
+          );
+          return true;
+        }
       }
+      return false;
+    }else {
+      for (let i = 0; i < NUM_OF_BITS; i++) {
+        if (
+          isPointInRect(
+            mouseX,
+            mouseY,
+            this.position.x - this.SCALE / 2,
+            this.position.y - this.SCALE / 2 + i * this.SCALE,
+            this.SCALE,
+            this.SCALE
+          )
+        ) {
+          console.log(i);
+          this.binary = replaceBit(this.binary, i, this.binary[i]=="1"?"0":"1");
+          return true;
+        }
+      }
+      return false;
     }
-    return false;
   }
 }
 
@@ -277,6 +309,15 @@ class LogicGate {
           this.output()
         );
         break;
+      case "xor":
+        drawXORGate(
+          this.position.x - 20,
+          this.position.y - 35 / 2,
+          40,
+          35,
+          this.output()
+        );
+        break;
     }
   }
   output() {
@@ -287,11 +328,16 @@ class LogicGate {
         return !this.inputASupplier();
       case "or":
         return this.inputASupplier() || this.inputBSupplier();
+      case "xor":
+        return (
+          (this.inputASupplier() || this.inputBSupplier()) &&
+          !(this.inputASupplier() && this.inputBSupplier())
+        );
     }
   }
 
   assignInput(inputSupplier, y, line) {
-    if (this.type == "or" || this.type == "and") {
+    if (this.type !== "not") {
       if (y - this.position.y < 0) {
         // Remove the old line if overwriting
         if (this.inputALine) {
@@ -330,10 +376,10 @@ class outputBinaryDisplay extends BinaryDisplay {
   constructor(startX, startY) {
     super(0, startX, startY);
     this.bitSuppliers = [];
-    this.inputLines = []
+    this.inputLines = [];
     for (let i = 0; i < NUM_OF_BITS; i++) {
       this.bitSuppliers.push(() => false);
-      this.inputLines.push(null)
+      this.inputLines.push(null);
     }
 
     this.inputLine = null;
@@ -341,7 +387,13 @@ class outputBinaryDisplay extends BinaryDisplay {
   update() {
     super.update();
     for (let i = 0; i < NUM_OF_BITS; i++) {
-      this.binary = replaceBit(this.binary, i, this.bitSuppliers[i]()?"1":"0");
+      if (this.bitSuppliers[i]) {
+        this.binary = replaceBit(
+          this.binary,
+          i,
+          this.bitSuppliers[i]() ? "1" : "0"
+        );
+      }
     }
   }
 

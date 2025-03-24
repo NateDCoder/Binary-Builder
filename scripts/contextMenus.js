@@ -25,6 +25,7 @@ class ContextMenu {
     if (!this.menuVisible) return;
     fill(255);
     stroke(0);
+    strokeWeight(2);
     rect(
       this.menuX,
       this.menuY,

@@ -1,7 +1,9 @@
 class SampleLine {
-  constructor(startX, startY, inputSupllier) {
-    this.start = createVector(startX, startY);
+  constructor(startXSupplier, startYSupplier, inputSupllier, logicGate = null) {
+    this.startXSupplier = startXSupplier;
+    this.startYSupplier = startYSupplier;
     this.inputSupllier = inputSupllier;
+    this.logicGate = logicGate;
   }
 
   show() {
@@ -11,16 +13,25 @@ class SampleLine {
       stroke(100);
     }
     strokeWeight(3);
-    line(this.start.x, this.start.y, mouseX, mouseY);
+    line(this.startXSupplier(), this.startYSupplier(), mouseX, mouseY);
   }
 }
 
 class Line {
-  constructor(startX, startY, endXSupplier, endYSupplier, inputSupllier) {
-    this.start = createVector(startX, startY);
+  constructor(
+    startXSupplier,
+    startYSupplier,
+    endXSupplier,
+    endYSupplier,
+    inputSupllier,
+    logicGate = null
+  ) {
+    this.startXSupplier = startXSupplier;
+    this.startYSupplier = startYSupplier;
     this.endXSupplier = endXSupplier;
     this.endYSupplier = endYSupplier;
     this.inputSupllier = inputSupllier;
+    this.logicGate = logicGate;
   }
 
   show() {
@@ -31,6 +42,11 @@ class Line {
     }
 
     strokeWeight(3);
-    line(this.start.x, this.start.y, this.endXSupplier(), this.endYSupplier());
+    line(
+      this.startXSupplier(),
+      this.startYSupplier(),
+      this.endXSupplier(),
+      this.endYSupplier()
+    );
   }
 }
