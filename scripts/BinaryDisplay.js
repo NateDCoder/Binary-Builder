@@ -70,7 +70,9 @@ class BinaryDisplay {
     sampleLine = new SampleLine(
       () => this.position.x + this.SCALE / 2, // X Position Supplier
       () => this.position.y + i * this.SCALE, // Y Position Supplier
-      () => int(this.binary[i]) == 1 // Binary state check
+      () => int(this.binary[i]) == 1, // Binary state check
+      false,
+      i
     );
   }
 
@@ -88,9 +90,11 @@ class OutputBinaryDisplay extends BinaryDisplay {
     super(0, startX, startY);
     this.bitSuppliers = [];
     this.inputLines = [];
+    this.lineIndexs = [];
     for (let i = 0; i < NUM_OF_BITS; i++) {
       this.bitSuppliers.push(() => false);
       this.inputLines.push(null);
+      this.lineIndexs.push(null);
     }
 
     this.inputLine = null;
@@ -120,5 +124,10 @@ class OutputBinaryDisplay extends BinaryDisplay {
       }
     }
     return false;
+  }
+  toJSON() {
+    return {
+      lineIndexs : this.lineIndexs
+    }
   }
 }

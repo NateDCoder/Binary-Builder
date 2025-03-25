@@ -52,22 +52,24 @@ function draw() {
 
 function mousePressed() {
   let intersect = false;
-  for (let logicGate of logicGates) {
-    if (logicGate.intersect(mouseX, mouseY)) {
+  for (let i = 0; i < logicGates.length; i++) {
+    if (logicGates[i].intersect(mouseX, mouseY)) {
       intersect = true;
       if (mouseButton === RIGHT) {
         sampleLine = new SampleLine(
-          () => logicGate.position.x + 15,
-          () => logicGate.position.y,
-          () => logicGate.output()
+          () => logicGates[i].position.x + 15,
+          () => logicGates[i].position.y,
+          () => logicGates[i].output(),
+          true,
+          i
         );
       } else {
-        logicGate.draggable = true;
+        logicGates[i].draggable = true;
       }
       break;
     }
   }
-  if (number1.intersect(mouseButton)) return;// || number2.intersect(mouseButton)) return;
+  if (number1.intersect(mouseButton)) return; // || number2.intersect(mouseButton)) return;
   if (mouseButton === RIGHT && !intersect) {
     contextMenu.show(mouseX, mouseY);
   }
@@ -105,13 +107,16 @@ function mouseReleased() {
                 ? logicGate.position.y - 8
                 : logicGate.position.y + 8
               : logicGate.position.y,
-          sampleLine.inputSupllier
+          sampleLine.inputSupplier,
+          sampleLine.logicGateInput,
+          sampleLine.index
         )
       );
       logicGate.assignInput(
-        sampleLine.inputSupllier,
+        sampleLine.inputSupplier,
         mouseY,
-        lines[lines.length - 1]
+        lines[lines.length - 1],
+        lines.length - 1
       );
     }
   }
@@ -123,7 +128,9 @@ function mouseReleased() {
         sampleLine.startYSupplier,
         () => endPoint.x,
         () => endPoint.y,
-        sampleLine.inputSupllier
+        sampleLine.inputSupplier,
+        sampleLine.logicGateInput,
+        sampleLine.index
       )
     );
 
@@ -132,9 +139,10 @@ function mouseReleased() {
         (line) => line !== output.inputLines[output.intersectedBit]
       );
     }
+    console.log("IntersectedBit", output.intersectedBit);
     output.inputLines[output.intersectedBit] = lines[lines.length - 1];
-
-    output.bitSuppliers[output.intersectedBit] = sampleLine.inputSupllier;
+    output.lineIndexs[output.intersectedBit] = lines.length - 1;
+    output.bitSuppliers[output.intersectedBit] = sampleLine.inputSupplier;
   }
 
   sampleLine = null;
@@ -161,5 +169,100 @@ function keyPressed() {
     currentIndex = Math.max(0, --currentIndex);
     number1.binary = dec2Bin(inputs[currentIndex]);
     answer.binary = dec2Bin(outputs[currentIndex]);
+  } else if (key == "l" || key == "L") {
+    loadProgress();
+  } else if (key == "s" || key == "S") {
+    saveProgress();
+  }
+}
+
+function saveProgress() {
+  const state = {
+    logicGates: logicGates.map((gate) => gate.toJSON()),
+    lines: lines.map((line) => line.toJSON()),
+    output: output.toJSON(),
+    currentIndex: currentIndex,
+    number1Binary: number1.binary,
+    answerBinary: answer.binary,
+  };
+
+  localStorage.setItem("circuitState", JSON.stringify(state));
+  console.log("Progress saved.");
+}
+const restoreSupplierFunc = (value) => {
+  return value; // This can be customized depending on how the suppliers are structured
+};
+async function loadProgress() {
+  var savedState = localStorage.getItem("circuitState");
+  if (!savedState) {
+    try {
+      savedState = await (await fetch("adder.json")).json();
+    } catch (e) {}
+  }
+  console.log(savedState);
+  if (savedState) {
+    try {
+      var state = JSON.parse(savedState);
+    } catch (e) {
+      var state = savedState;
+    }
+    for (let i = 0; i < state.logicGates.length; i++) {
+      console.log(state.logicGates[i]);
+    }
+
+    // Restore logic gates
+    logicGates = state.logicGates.map((data) => {
+      const gate = new LogicGate(data.x, data.y, data.type);
+      if (data.inputALine)
+        gate.inputALine = Line.fromJSON(data.inputALine, restoreSupplierFunc);
+      if (data.inputBLine)
+        gate.inputBLine = Line.fromJSON(data.inputBLine, restoreSupplierFunc);
+      return gate;
+    });
+
+    // Restore lines
+    lines = state.lines.map((lineData) =>
+      Line.fromJSON(lineData, restoreSupplierFunc)
+    );
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].logicGateInput) {
+        lines[i].inputSupplier = () => logicGates[lines[i].index].output();
+      } else {
+        lines[i].inputSupplier = () => int(number1.binary[lines[i].index]) == 1;
+      }
+    }
+
+    for (let i = 0; i < state.logicGates.length; i++) {
+      console.log(state.logicGates[i]);
+      if (state.logicGates[i].inputAIndex !== null) {
+        logicGates[i].inputAIndex = state.logicGates[i].inputAIndex;
+        logicGates[i].inputASupplier = () =>
+          lines[state.logicGates[i].inputAIndex].inputSupplier();
+      }
+      if (state.logicGates[i].inputBIndex !== null) {
+        logicGates[i].inputBIndex = state.logicGates[i].inputBIndex;
+        logicGates[i].inputBSupplier = () =>
+          lines[state.logicGates[i].inputBIndex].inputSupplier();
+      }
+    }
+    console.log(state.output.lineIndexs);
+    for (let i = 0; i < state.output.lineIndexs.length; i++) {
+      if (state.output.lineIndexs[i] !== null) {
+        output.inputLines[i] = lines[state.output.lineIndexs[i]];
+        output.lineIndexs[i] = state.output.lineIndexs[i];
+        output.bitSuppliers[i] = () =>
+          lines[state.output.lineIndexs[i]].inputSupplier();
+      }
+    }
+
+    // Restore binary displays
+    currentIndex = state.currentIndex;
+    number1.binary = state.number1Binary;
+    answer.binary = state.answerBinary;
+
+    console.log("Progress loaded.");
+  } else {
+    console.log("No saved progress found.");
   }
 }

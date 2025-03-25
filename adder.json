@@ -1,0 +1,617 @@
+{
+    "logicGates": [
+        {
+            "type": "not",
+            "x": 202,
+            "y": 386.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 390,
+                "endX": 177,
+                "endY": 386.8000030517578,
+                "logicGateInput": false,
+                "index": 7
+            },
+            "inputBLine": null,
+            "inputAIndex": 0,
+            "inputBIndex": null
+        },
+        {
+            "type": "xor",
+            "x": 224,
+            "y": 353.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 360,
+                "endX": 199,
+                "endY": 345.8000030517578,
+                "logicGateInput": false,
+                "index": 6
+            },
+            "inputBLine": {
+                "startX": 45,
+                "startY": 390,
+                "endX": 199,
+                "endY": 361.8000030517578,
+                "logicGateInput": false,
+                "index": 7
+            },
+            "inputAIndex": 4,
+            "inputBIndex": 5
+        },
+        {
+            "type": "and",
+            "x": 149,
+            "y": 321.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 360,
+                "endX": 124,
+                "endY": 313.8000030517578,
+                "logicGateInput": false,
+                "index": 6
+            },
+            "inputBLine": {
+                "startX": 45,
+                "startY": 390,
+                "endX": 124,
+                "endY": 329.8000030517578,
+                "logicGateInput": false,
+                "index": 7
+            },
+            "inputAIndex": 2,
+            "inputBIndex": 3
+        },
+        {
+            "type": "xor",
+            "x": 307,
+            "y": 268.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 330,
+                "endX": 282,
+                "endY": 260.8000030517578,
+                "logicGateInput": false,
+                "index": 5
+            },
+            "inputBLine": {
+                "startX": 164,
+                "startY": 321.8000030517578,
+                "endX": 282,
+                "endY": 276.8000030517578,
+                "logicGateInput": true,
+                "index": 2
+            },
+            "inputAIndex": 6,
+            "inputBIndex": 7
+        },
+        {
+            "type": "xor",
+            "x": 346,
+            "y": 203.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 300,
+                "endX": 321,
+                "endY": 195.8000030517578,
+                "logicGateInput": false,
+                "index": 4
+            },
+            "inputBLine": {
+                "startX": 241,
+                "startY": 258.8000030517578,
+                "endX": 321,
+                "endY": 211.8000030517578,
+                "logicGateInput": true,
+                "index": 5
+            },
+            "inputAIndex": 13,
+            "inputBIndex": 12
+        },
+        {
+            "type": "and",
+            "x": 226,
+            "y": 258.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 330,
+                "endX": 201,
+                "endY": 250.8000030517578,
+                "logicGateInput": false,
+                "index": 5
+            },
+            "inputBLine": {
+                "startX": 164,
+                "startY": 321.8000030517578,
+                "endX": 201,
+                "endY": 266.8000030517578,
+                "logicGateInput": true,
+                "index": 2
+            },
+            "inputAIndex": 10,
+            "inputBIndex": 11
+        },
+        {
+            "type": "and",
+            "x": 264,
+            "y": 200.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 300,
+                "endX": 239,
+                "endY": 192.8000030517578,
+                "logicGateInput": false,
+                "index": 4
+            },
+            "inputBLine": {
+                "startX": 241,
+                "startY": 258.8000030517578,
+                "endX": 239,
+                "endY": 208.8000030517578,
+                "logicGateInput": true,
+                "index": 5
+            },
+            "inputAIndex": 15,
+            "inputBIndex": 16
+        },
+        {
+            "type": "xor",
+            "x": 377,
+            "y": 158.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 270,
+                "endX": 352,
+                "endY": 150.8000030517578,
+                "logicGateInput": false,
+                "index": 3
+            },
+            "inputBLine": {
+                "startX": 279,
+                "startY": 200.8000030517578,
+                "endX": 352,
+                "endY": 166.8000030517578,
+                "logicGateInput": true,
+                "index": 6
+            },
+            "inputAIndex": 18,
+            "inputBIndex": 18
+        },
+        {
+            "type": "and",
+            "x": 299,
+            "y": 129.8000030517578,
+            "inputALine": {
+                "startX": 45,
+                "startY": 270,
+                "endX": 274,
+                "endY": 121.80000305175781,
+                "logicGateInput": false,
+                "index": 3
+            },
+            "inputBLine": {
+                "startX": 279,
+                "startY": 200.8000030517578,
+                "endX": 274,
+                "endY": 137.8000030517578,
+                "logicGateInput": true,
+                "index": 6
+            },
+            "inputAIndex": 21,
+            "inputBIndex": 20
+        },
+        {
+            "type": "xor",
+            "x": 374,
+            "y": 122.80000305175781,
+            "inputALine": {
+                "startX": 45,
+                "startY": 240,
+                "endX": 349,
+                "endY": 114.80000305175781,
+                "logicGateInput": false,
+                "index": 2
+            },
+            "inputBLine": {
+                "startX": 314,
+                "startY": 129.8000030517578,
+                "endX": 349,
+                "endY": 130.8000030517578,
+                "logicGateInput": true,
+                "index": 8
+            },
+            "inputAIndex": 23,
+            "inputBIndex": 22
+        },
+        {
+            "type": "and",
+            "x": 338,
+            "y": 88.80000305175781,
+            "inputALine": {
+                "startX": 45,
+                "startY": 240,
+                "endX": 313,
+                "endY": 80.80000305175781,
+                "logicGateInput": false,
+                "index": 2
+            },
+            "inputBLine": {
+                "startX": 314,
+                "startY": 129.8000030517578,
+                "endX": 313,
+                "endY": 96.80000305175781,
+                "logicGateInput": true,
+                "index": 8
+            },
+            "inputAIndex": 26,
+            "inputBIndex": 26
+        },
+        {
+            "type": "xor",
+            "x": 398,
+            "y": 88.80000305175781,
+            "inputALine": {
+                "startX": 45,
+                "startY": 210,
+                "endX": 373,
+                "endY": 80.80000305175781,
+                "logicGateInput": false,
+                "index": 1
+            },
+            "inputBLine": {
+                "startX": 353,
+                "startY": 88.80000305175781,
+                "endX": 373,
+                "endY": 96.80000305175781,
+                "logicGateInput": true,
+                "index": 10
+            },
+            "inputAIndex": 28,
+            "inputBIndex": 27
+        },
+        {
+            "type": "xor",
+            "x": 429,
+            "y": 47.80000305175781,
+            "inputALine": {
+                "startX": 45,
+                "startY": 180,
+                "endX": 404,
+                "endY": 39.80000305175781,
+                "logicGateInput": false,
+                "index": 0
+            },
+            "inputBLine": {
+                "startX": 351,
+                "startY": 52.80000305175781,
+                "endX": 404,
+                "endY": 55.80000305175781,
+                "logicGateInput": true,
+                "index": 13
+            },
+            "inputAIndex": 33,
+            "inputBIndex": 32
+        },
+        {
+            "type": "and",
+            "x": 336,
+            "y": 52.80000305175781,
+            "inputALine": {
+                "startX": 45,
+                "startY": 210,
+                "endX": 311,
+                "endY": 44.80000305175781,
+                "logicGateInput": false,
+                "index": 1
+            },
+            "inputBLine": {
+                "startX": 353,
+                "startY": 88.80000305175781,
+                "endX": 311,
+                "endY": 60.80000305175781,
+                "logicGateInput": true,
+                "index": 10
+            },
+            "inputAIndex": 31,
+            "inputBIndex": 30
+        }
+    ],
+    "lines": [
+        {
+            "startX": 45,
+            "startY": 390,
+            "endX": 177,
+            "endY": 386.8000030517578,
+            "logicGateInput": false,
+            "index": 7
+        },
+        {
+            "startX": 217,
+            "startY": 386.8000030517578,
+            "endX": 485,
+            "endY": 390,
+            "logicGateInput": true,
+            "index": 0
+        },
+        {
+            "startX": 45,
+            "startY": 360,
+            "endX": 124,
+            "endY": 313.8000030517578,
+            "logicGateInput": false,
+            "index": 6
+        },
+        {
+            "startX": 45,
+            "startY": 390,
+            "endX": 124,
+            "endY": 329.8000030517578,
+            "logicGateInput": false,
+            "index": 7
+        },
+        {
+            "startX": 45,
+            "startY": 360,
+            "endX": 199,
+            "endY": 345.8000030517578,
+            "logicGateInput": false,
+            "index": 6
+        },
+        {
+            "startX": 45,
+            "startY": 390,
+            "endX": 199,
+            "endY": 361.8000030517578,
+            "logicGateInput": false,
+            "index": 7
+        },
+        {
+            "startX": 45,
+            "startY": 330,
+            "endX": 282,
+            "endY": 260.8000030517578,
+            "logicGateInput": false,
+            "index": 5
+        },
+        {
+            "startX": 164,
+            "startY": 321.8000030517578,
+            "endX": 282,
+            "endY": 276.8000030517578,
+            "logicGateInput": true,
+            "index": 2
+        },
+        {
+            "startX": 239,
+            "startY": 353.8000030517578,
+            "endX": 485,
+            "endY": 360,
+            "logicGateInput": true,
+            "index": 1
+        },
+        {
+            "startX": 322,
+            "startY": 268.8000030517578,
+            "endX": 485,
+            "endY": 330,
+            "logicGateInput": true,
+            "index": 3
+        },
+        {
+            "startX": 45,
+            "startY": 330,
+            "endX": 201,
+            "endY": 250.8000030517578,
+            "logicGateInput": false,
+            "index": 5
+        },
+        {
+            "startX": 164,
+            "startY": 321.8000030517578,
+            "endX": 201,
+            "endY": 266.8000030517578,
+            "logicGateInput": true,
+            "index": 2
+        },
+        {
+            "startX": 241,
+            "startY": 258.8000030517578,
+            "endX": 321,
+            "endY": 211.8000030517578,
+            "logicGateInput": true,
+            "index": 5
+        },
+        {
+            "startX": 45,
+            "startY": 300,
+            "endX": 321,
+            "endY": 195.8000030517578,
+            "logicGateInput": false,
+            "index": 4
+        },
+        {
+            "startX": 361,
+            "startY": 203.8000030517578,
+            "endX": 485,
+            "endY": 300,
+            "logicGateInput": true,
+            "index": 4
+        },
+        {
+            "startX": 45,
+            "startY": 300,
+            "endX": 239,
+            "endY": 192.8000030517578,
+            "logicGateInput": false,
+            "index": 4
+        },
+        {
+            "startX": 241,
+            "startY": 258.8000030517578,
+            "endX": 239,
+            "endY": 208.8000030517578,
+            "logicGateInput": true,
+            "index": 5
+        },
+        {
+            "startX": 45,
+            "startY": 270,
+            "endX": 352,
+            "endY": 150.8000030517578,
+            "logicGateInput": false,
+            "index": 3
+        },
+        {
+            "startX": 279,
+            "startY": 200.8000030517578,
+            "endX": 352,
+            "endY": 166.8000030517578,
+            "logicGateInput": true,
+            "index": 6
+        },
+        {
+            "startX": 392,
+            "startY": 158.8000030517578,
+            "endX": 485,
+            "endY": 270,
+            "logicGateInput": true,
+            "index": 7
+        },
+        {
+            "startX": 279,
+            "startY": 200.8000030517578,
+            "endX": 274,
+            "endY": 137.8000030517578,
+            "logicGateInput": true,
+            "index": 6
+        },
+        {
+            "startX": 45,
+            "startY": 270,
+            "endX": 274,
+            "endY": 121.80000305175781,
+            "logicGateInput": false,
+            "index": 3
+        },
+        {
+            "startX": 314,
+            "startY": 129.8000030517578,
+            "endX": 349,
+            "endY": 130.8000030517578,
+            "logicGateInput": true,
+            "index": 8
+        },
+        {
+            "startX": 45,
+            "startY": 240,
+            "endX": 349,
+            "endY": 114.80000305175781,
+            "logicGateInput": false,
+            "index": 2
+        },
+        {
+            "startX": 389,
+            "startY": 122.80000305175781,
+            "endX": 485,
+            "endY": 240,
+            "logicGateInput": true,
+            "index": 9
+        },
+        {
+            "startX": 45,
+            "startY": 240,
+            "endX": 313,
+            "endY": 80.80000305175781,
+            "logicGateInput": false,
+            "index": 2
+        },
+        {
+            "startX": 314,
+            "startY": 129.8000030517578,
+            "endX": 313,
+            "endY": 96.80000305175781,
+            "logicGateInput": true,
+            "index": 8
+        },
+        {
+            "startX": 353,
+            "startY": 88.80000305175781,
+            "endX": 373,
+            "endY": 96.80000305175781,
+            "logicGateInput": true,
+            "index": 10
+        },
+        {
+            "startX": 45,
+            "startY": 210,
+            "endX": 373,
+            "endY": 80.80000305175781,
+            "logicGateInput": false,
+            "index": 1
+        },
+        {
+            "startX": 413,
+            "startY": 88.80000305175781,
+            "endX": 485,
+            "endY": 210,
+            "logicGateInput": true,
+            "index": 11
+        },
+        {
+            "startX": 353,
+            "startY": 88.80000305175781,
+            "endX": 311,
+            "endY": 60.80000305175781,
+            "logicGateInput": true,
+            "index": 10
+        },
+        {
+            "startX": 45,
+            "startY": 210,
+            "endX": 311,
+            "endY": 44.80000305175781,
+            "logicGateInput": false,
+            "index": 1
+        },
+        {
+            "startX": 351,
+            "startY": 52.80000305175781,
+            "endX": 404,
+            "endY": 55.80000305175781,
+            "logicGateInput": true,
+            "index": 13
+        },
+        {
+            "startX": 45,
+            "startY": 180,
+            "endX": 404,
+            "endY": 39.80000305175781,
+            "logicGateInput": false,
+            "index": 0
+        },
+        {
+            "startX": 444,
+            "startY": 47.80000305175781,
+            "endX": 485,
+            "endY": 180,
+            "logicGateInput": true,
+            "index": 12
+        }
+    ],
+    "output": {
+        "lineIndexs": [
+            34,
+            29,
+            24,
+            19,
+            14,
+            9,
+            8,
+            1
+        ]
+    },
+    "currentIndex": 4,
+    "number1Binary": "00000100",
+    "answerBinary": "00000101"
+}
+
