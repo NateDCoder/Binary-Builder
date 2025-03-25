@@ -95,8 +95,8 @@ class OutputBinaryDisplay extends BinaryDisplay {
 
     this.inputLine = null;
   }
-  update() {
-    super.update();
+  update(x, y) {
+    super.update(x, y);
     for (let i = 0; i < NUM_OF_BITS; i++) {
       if (this.bitSuppliers[i]) {
         this.binary = replaceBit(

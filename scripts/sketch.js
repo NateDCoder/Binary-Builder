@@ -1,5 +1,5 @@
 const NUM_OF_BITS = 8;
-var number1, number2, output;
+var number1, number2, output, answer;
 var logicGates = [];
 var lines = [];
 var contextMenu; // Create a variable for the ContextMenu
@@ -9,10 +9,16 @@ var sampleLine = null;
 function setup() {
   let canvas = createCanvas(600, 600);
   canvas.elt.oncontextmenu = () => false;
-  number1 = new BinaryDisplay(1, 30, 40 + 15);
-  number2 = new BinaryDisplay(1, 30, height / 2 + 20 + 15);
+  number1 = new BinaryDisplay(inputs[currentIndex], 30, height / 2 - 30 * 4);
+  // number1 = new BinaryDisplay(1, 30, 40 + 15);
+  // number2 = new BinaryDisplay(1, 30, height / 2 + 20 + 15);
 
-  output = new OutputBinaryDisplay(width - 30, height / 2 - 30 * 4);
+  output = new OutputBinaryDisplay(width - 100, height / 2 - 30 * 4);
+  answer = new BinaryDisplay(
+    outputs[currentIndex],
+    width - 60,
+    height / 2 - 30 * 4
+  );
 
   contextMenu = new ContextMenu(menuOptions);
 }
@@ -22,11 +28,14 @@ function draw() {
   number1.show();
   number1.update(mouseX, mouseY);
 
-  number2.show();
-  number2.update(mouseX, mouseY);
+  // number2.show();
+  // number2.update(mouseX, mouseY);
 
   output.show();
-  output.update();
+  output.update(mouseX, mouseY);
+
+  answer.show();
+  answer.update(mouseX, mouseY);
 
   if (sampleLine) {
     sampleLine.show();
@@ -55,10 +64,10 @@ function mousePressed() {
       } else {
         logicGate.draggable = true;
       }
+      break;
     }
   }
-  if (number1.intersect(mouseButton) || number2.intersect(mouseButton)) return;
-
+  if (number1.intersect(mouseButton)) return;// || number2.intersect(mouseButton)) return;
   if (mouseButton === RIGHT && !intersect) {
     contextMenu.show(mouseX, mouseY);
   }
@@ -144,5 +153,13 @@ function keyPressed() {
         i--; // Adjust the index after removal to prevent skipping elements
       }
     }
+  } else if (keyCode === UP_ARROW) {
+    currentIndex = Math.min(255, ++currentIndex);
+    number1.binary = dec2Bin(inputs[currentIndex]);
+    answer.binary = dec2Bin(outputs[currentIndex]);
+  } else if (keyCode === DOWN_ARROW) {
+    currentIndex = Math.max(0, --currentIndex);
+    number1.binary = dec2Bin(inputs[currentIndex]);
+    answer.binary = dec2Bin(outputs[currentIndex]);
   }
 }
