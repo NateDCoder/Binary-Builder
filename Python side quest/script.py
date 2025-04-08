@@ -3,26 +3,28 @@ from scipy.special import softmax
 
 np.random.seed(3)
 
-def tableOpperator(A, B, index):
-    operations = [
-        lambda A, B: 0,                       # 0: False
-        lambda A, B: A * B,                   # 1: A ∧ B
-        lambda A, B: A - A * B,               # 2: ¬(A ⇒ B)
-        lambda A, B: A,                       # 3: A
-        lambda A, B: B - A * B,               # 4: ¬(A ⇐ B)
-        lambda A, B: B,                       # 5: B
-        lambda A, B: A + B - 2 * A * B,       # 6: A ⊕ B
-        lambda A, B: A + B - A * B,           # 7: A ∨ B
-        lambda A, B: 1 - (A + B - A * B),     # 8: ¬(A ∨ B)
-        lambda A, B: 1 - (A + B - 2 * A * B), # 9: ¬(A ⊕ B)
-        lambda A, B: 1 - B,                   # 10: ¬B
-        lambda A, B: 1 - B + A * B,           # 11: A ⇐ B
-        lambda A, B: 1 - A,                   # 12: ¬A
-        lambda A, B: 1 - A + A * B,           # 13: A ⇒ B
-        lambda A, B: 1 - A * B,               # 14: ¬(A ∧ B)
-        lambda A, B: 1                        # 15: True
-    ]
-    return operations[index](A, B)
+def tableOperator(A, B):
+    # Create a table of logical operations using numpy
+    operations = np.array([
+        0,                                   # 0: False
+        A * B,                               # 1: A ∧ B
+        A - A * B,                           # 2: ¬(A ⇒ B)
+        A,                                   # 3: A
+        B - A * B,                           # 4: ¬(A ⇐ B)
+        B,                                   # 5: B
+        A + B - 2 * A * B,                   # 6: A ⊕ B
+        A + B - A * B,                       # 7: A ∨ B
+        1 - (A + B - A * B),                 # 8: ¬(A ∨ B)
+        1 - (A + B - 2 * A * B),             # 9: ¬(A ⊕ B)
+        1 - B,                               # 10: ¬B
+        1 - B + A * B,                       # 11: A ⇐ B
+        1 - A,                               # 12: ¬A
+        1 - A + A * B,                       # 13: A ⇒ B
+        1 - A * B,                           # 14: ¬(A ∧ B)
+        1                                    # 15: True
+    ], dtype=float)
+
+    return operations
 
 
 
@@ -87,7 +89,7 @@ class Nueron:
 
     def output(self, A, B):
         self.probablities = softmax(self.weights)
-        self.weight_gradient = np.array([tableOpperator(A, B, i) for i in range(16)], dtype=float)
+        self.weight_gradient = tableOperator(A, B) 
 
         self.a_delta = np.array([derivativeA(A, B, i) for i in range(16)], dtype=float) * self.probablities
         self.b_delta = np.array([derivativeB(A, B, i) for i in range(16)], dtype=float) * self.probablities
@@ -150,6 +152,7 @@ class NueralNetwork:
             layer_size = model_size[i+1]
             self.layers.append(Layer(layer_size, model_size[i]))
     def forward(self, input):
+
         hidden = []
 
         hidden.append(self.layers[0].layer_ouput(input))
@@ -170,6 +173,23 @@ class NueralNetwork:
                 error = self.layers[i].prev_layer_error(error)
                 error = error / (np.linalg.norm(error) + 1e-8)
 
+
+# For example, create batch for 0 through 7
+batch_inputs = []
+batch_targets = []
+
+for i in range(8):
+    bin_input = list(dec2Bin(i))
+    bin_target = list(dec2Bin((i + 1) % 16))  # wrap-around for 4-bit
+
+    batch_inputs.append([float(x) for x in bin_input])
+    batch_targets.append([float(x) for x in bin_target])
+
+batch_inputs = np.array(batch_inputs)   # shape (8, 4)
+batch_targets = np.array(batch_targets) # shape (8, 4)
+
+print(batch_inputs)
+
 binary_number = dec2Bin(5)
 input = np.array(list(binary_number), dtype=float)
 
@@ -179,9 +199,10 @@ epochs = 1000
 past_error = 10000
 for i in range(epochs):
     output = network.forward(input)
+    # output = network.forward(batch_inputs)
     error = output - target
-    # if (np.sum(error * error) > past_error):
-        # quit()
+    if (np.sum(error * error) > past_error):
+        quit()
     print("Error:", np.sum(error * error))
     past_error = np.sum(error * error)
     network.backward_prop(error)
