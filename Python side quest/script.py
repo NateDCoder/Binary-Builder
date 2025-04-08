@@ -4,74 +4,97 @@ from scipy.special import softmax
 np.random.seed(3)
 
 def tableOperator(A, B):
-    # Create a table of logical operations using numpy
-    operations = np.array([
-        0,                                   # 0: False
-        A * B,                               # 1: A ∧ B
-        A - A * B,                           # 2: ¬(A ⇒ B)
-        A,                                   # 3: A
-        B - A * B,                           # 4: ¬(A ⇐ B)
-        B,                                   # 5: B
-        A + B - 2 * A * B,                   # 6: A ⊕ B
-        A + B - A * B,                       # 7: A ∨ B
-        1 - (A + B - A * B),                 # 8: ¬(A ∨ B)
-        1 - (A + B - 2 * A * B),             # 9: ¬(A ⊕ B)
-        1 - B,                               # 10: ¬B
-        1 - B + A * B,                       # 11: A ⇐ B
-        1 - A,                               # 12: ¬A
-        1 - A + A * B,                       # 13: A ⇒ B
-        1 - A * B,                           # 14: ¬(A ∧ B)
-        1                                    # 15: True
-    ], dtype=float)
+    # Ensure A and B are numpy arrays and broadcast scalars to arrays if necessary
+    A = np.asarray(A)
+    B = np.asarray(B)
+    
+    # Initialize an empty list to store the results of logical operations
+    operations = []
 
-    return operations
+    # Perform logical operations
+    operations.append(np.zeros(A.shape))        # 0: False
+    operations.append(A * B)                    # 1: A ∧ B
+    operations.append(A - A * B)                # 2: ¬(A ⇒ B)
+    operations.append(A)                        # 3: A
+    operations.append(B - A * B)                # 4: ¬(A ⇐ B)
+    operations.append(B)                        # 5: B
+    operations.append(A + B - 2 * A * B)        # 6: A ⊕ B
+    operations.append(A + B - A * B)            # 7: A ∨ B
+    operations.append(1 - (A + B - A * B))      # 8: ¬(A ∨ B)
+    operations.append(1 - (A + B - 2 * A * B))  # 9: ¬(A ⊕ B)
+    operations.append(1 - B)                    # 10: ¬B
+    operations.append(1 - B + A * B)            # 11: A ⇐ B
+    operations.append(1 - A)                    # 12: ¬A
+    operations.append(1 - A + A * B)            # 13: A ⇒ B
+    operations.append(1 - A * B)                # 14: ¬(A ∧ B)
+    operations.append(np.ones(A.shape))         # 15: True
 
+    # Stack all operations into a 16 x n matrix
+    result = np.vstack(operations)
+    
+    return result
 
+def derivativeA(A, B):
+    # Ensure A and B are numpy arrays and broadcast scalars to arrays if necessary
+    A = np.asarray(A)
+    B = np.asarray(B)
+    
+    # Initialize an empty list to store the derivatives
+    derivativesA = []
 
-def derivativeA(A, B, index):
-    derivativesA = [
-        lambda A, B: 0,         # 0: False
-        lambda A, B: B,         # 1: A ∧ B
-        lambda A, B: 1 - B,     # 2: ¬(A ⇒ B)
-        lambda A, B: 1,         # 3: A
-        lambda A, B: -B,        # 4: ¬(A ⇐ B)
-        lambda A, B: 0,         # 5: B
-        lambda A, B: 1 - 2 * B, # 6: A ⊕ B
-        lambda A, B: 1 - B,     # 7: A ∨ B
-        lambda A, B: B - 1,     # 8: ¬(A ∨ B)
-        lambda A, B: 2 * B - 1, # 9: ¬(A ⊕ B)
-        lambda A, B: 0,         # 10: ¬B
-        lambda A, B: B,         # 11: A ⇐ B
-        lambda A, B: -1,        # 12: ¬A
-        lambda A, B: -1 + B,    # 13: A ⇒ B
-        lambda A, B: -B,        # 14: ¬(A ∧ B)
-        lambda A, B: 0          # 15: True
-    ]
-    return derivativesA[index](A, B)
+    # Perform derivative calculations for A (corresponding to each operation)
+    derivativesA.append(np.zeros(A.shape))        # 0: False 
+    derivativesA.append(B)                        # 1: A ∧ B 
+    derivativesA.append(1 - B)                    # 2: ¬(A ⇒ B) 
+    derivativesA.append(np.ones(A.shape))         # 3: A 
+    derivativesA.append(-B)                       # 4: ¬(A ⇐ B) 
+    derivativesA.append(np.zeros(A.shape))        # 5: B 
+    derivativesA.append(1 - 2 * B)                # 6: A ⊕ B 
+    derivativesA.append(1 - B)                    # 7: A ∨ B 
+    derivativesA.append(B - 1)                    # 8: ¬(A ∨ B) 
+    derivativesA.append(2 * B - 1)                # 9: ¬(A ⊕ B) 
+    derivativesA.append(np.zeros(A.shape))        # 10: ¬B 
+    derivativesA.append(B)                        # 11: A ⇐ B 
+    derivativesA.append(-np.ones(A.shape))        # 12: ¬A 
+    derivativesA.append(B - 1)                    # 13: A ⇒ B 
+    derivativesA.append(-B)                       # 14: ¬(A ∧ B) 
+    derivativesA.append(np.zeros(A.shape))        # 15: True 
 
-def derivativeB(A, B, index):
-    derivativesB = [
-        lambda A, B: 0,         # 0: False
-        lambda A, B: A,         # 1: A ∧ B
-        lambda A, B: -A,        # 2: ¬(A ⇒ B)
-        lambda A, B: 0,         # 3: A
-        lambda A, B: 1 - A,     # 4: ¬(A ⇐ B)
-        lambda A, B: 1,         # 5: B
-        lambda A, B: 1 - 2 * A, # 6: A ⊕ B
-        lambda A, B: 1 - A,     # 7: A ∨ B
-        lambda A, B: A - 1,     # 8: ¬(A ∨ B)
-        lambda A, B: 2 * A - 1, # 9: ¬(A ⊕ B)
-        lambda A, B: -1,        # 10: ¬B
-        lambda A, B: -1 + A,    # 11: A ⇐ B
-        lambda A, B: 0,         # 12: ¬A
-        lambda A, B: A,         # 13: A ⇒ B
-        lambda A, B: -A,        # 14: ¬(A ∧ B)
-        lambda A, B: 0          # 15: True
-    ]
-    return derivativesB[index](A, B)
+    # Stack all derivatives into a 16 x n matrix
+    result = np.vstack(derivativesA)
+    
+    return result
 
+def derivativeB(A, B):
+    # Ensure A and B are numpy arrays and broadcast scalars to arrays if necessary
+    A = np.asarray(A)
+    B = np.asarray(B)
+    
+    # Initialize an empty list to store the derivatives
+    derivativesB = []
 
+    # Perform derivative calculations for B (corresponding to each operation)
+    derivativesB.append(np.zeros(A.shape))        # 0: False
+    derivativesB.append(A)                        # 1: A ∧ B
+    derivativesB.append(-A)                       # 2: ¬(A ⇒ B) 
+    derivativesB.append(np.zeros(A.shape))        # 3: A 
+    derivativesB.append(1 - A)                    # 4: ¬(A ⇐ B) 
+    derivativesB.append(np.ones(A.shape))         # 5: B
+    derivativesB.append(1 - 2 * A)                # 6: A ⊕ B
+    derivativesB.append(1 - A)                    # 7: A ∨ B 
+    derivativesB.append(A - 1)                    # 8: ¬(A ∨ B)
+    derivativesB.append(2 * A - 1)                # 9: ¬(A ⊕ B)
+    derivativesB.append(np.ones(A.shape))         # 10: ¬B
+    derivativesB.append(1 - A)                    # 11: A ⇐ B
+    derivativesB.append(np.zeros(A.shape))        # 12: ¬A
+    derivativesB.append(A)                        # 13: A ⇒ B
+    derivativesB.append(-A)                       # 14: ¬(A ∧ B)
+    derivativesB.append(np.zeros(A.shape))        # 15: True
 
+    # Stack all derivatives into a 16 x n matrix
+    result = np.vstack(derivativesB)
+    
+    return result
 def dec2Bin(dec):
     bin = ""
     while (dec > 0):
@@ -88,17 +111,16 @@ class Nueron:
         self.weights = np.random.randn(16)
 
     def output(self, A, B):
-        self.probablities = softmax(self.weights)
+        self.probablities = softmax(self.weights)[:, np.newaxis]
         self.weight_gradient = tableOperator(A, B) 
 
-        self.a_delta = np.array([derivativeA(A, B, i) for i in range(16)], dtype=float) * self.probablities
-        self.b_delta = np.array([derivativeB(A, B, i) for i in range(16)], dtype=float) * self.probablities
+        self.a_delta = derivativeA(A, B) * self.probablities
+        self.b_delta = derivativeB(A, B) * self.probablities
 
-        result = np.sum(self.weight_gradient * self.probablities)
-
+        result = np.sum(self.weight_gradient * self.probablities, axis=0)
         return result
     def update_weights(self, lr):
-        self.weights -= self.weight_gradient * lr
+        self.weights -= np.sum(self.weight_gradient, axis=1) * (1 / self.weight_gradient.shape[1]) * lr
 
 class Layer:
     def __init__(self, size, prev_size):
@@ -114,15 +136,15 @@ class Layer:
 
             self.layer.append(Nueron(indexA, indexB))
     def layer_ouput(self, prev_layer_ouput):
-        layer_ouput = np.zeros(self.size)
+        layer_ouput = np.zeros((self.size, prev_layer_ouput.shape[1]))
 
         for i in range(self.size):
             layer_ouput[i] = self.layer[i].output(prev_layer_ouput[self.layer[i].a_index], prev_layer_ouput[self.layer[i].b_index])
+
         return layer_ouput
     def update_weight_delta(self, error):
         for i in range(self.size):
             self.layer[i].weight_gradient *= error[i]
-          
             self.layer[i].update_weights(0.1)
 
     def prev_layer_error(self, error):
@@ -138,8 +160,6 @@ class Layer:
 
             prev_layer_error[self.layer[i].a_index] += np.sum(self.layer[i].a_delta)
             prev_layer_error[self.layer[i].b_index] += np.sum(self.layer[i].b_delta)
-
-            self.layer[i].update_weights(0.01)
         return prev_layer_error
 
 
@@ -188,18 +208,19 @@ for i in range(8):
 batch_inputs = np.array(batch_inputs)   # shape (8, 4)
 batch_targets = np.array(batch_targets) # shape (8, 4)
 
-print(batch_inputs)
+# print(batch_inputs)
 
-binary_number = dec2Bin(5)
-input = np.array(list(binary_number), dtype=float)
+binary_number = dec2Bin(6)
+input = np.array([np.array(list(binary_number), dtype=float)]).T
 
-target = np.array(list(dec2Bin(6)), dtype=float)
+target = np.array([np.array(list(dec2Bin(6)), dtype=float)]).T
+
 network = NueralNetwork([8, 8, 8, 8])
 epochs = 1000
 past_error = 10000
 for i in range(epochs):
     output = network.forward(input)
-    # output = network.forward(batch_inputs)
+    # output = network.forward(batch_inputs.T)
     error = output - target
     if (np.sum(error * error) > past_error):
         quit()
