@@ -40,3 +40,28 @@ function replaceBit(bin, position, newBit) {
   // Replace the bit at the specified position and return the modified string
   return bin.substring(0, position) + newBit + bin.substring(position + 1);
 }
+
+function seededRandom(seed) {
+  let state = seed % 2147483647;
+  if (state <= 0) state += 2147483646;
+
+  return function () {
+    state = (state * 16807) % 2147483647;
+    return (state - 1) / 2147483646;
+  };
+}
+
+const rng = seededRandom(12345); // Seed value
+
+
+function softmax(arr) {
+  // Step 1: Calculate exponentials and handle large numbers
+  const maxVal = Math.max(...arr); // Prevent large exponent values
+  const exps = arr.map(x => Math.exp(x - maxVal));
+
+  // Step 2: Sum of exponentials
+  const sumExps = exps.reduce((sum, val) => sum + val, 0);
+
+  // Step 3: Divide each exponential by the sum to get probabilities
+  return exps.map(val => val / sumExps);
+}

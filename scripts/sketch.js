@@ -6,6 +6,8 @@ var contextMenu; // Create a variable for the ContextMenu
 const menuOptions = ["and", "or", "not", "xor"];
 
 var sampleLine = null;
+
+var nn;
 function setup() {
   let canvas = createCanvas(600, 600);
   canvas.elt.oncontextmenu = () => false;
@@ -21,6 +23,7 @@ function setup() {
   );
 
   contextMenu = new ContextMenu(menuOptions);
+  nn = new NueralNetwork([8, 8, 8], number1.binary);
 }
 
 function draw() {
@@ -30,9 +33,6 @@ function draw() {
 
   // number2.show();
   // number2.update(mouseX, mouseY);
-
-  output.show();
-  output.update(mouseX, mouseY);
 
   answer.show();
   answer.update(mouseX, mouseY);
@@ -48,6 +48,26 @@ function draw() {
     logicGate.show();
   }
   contextMenu.draw();
+  nn.clear();
+  let error = []
+  for (let j = 0; j < 128; j++) {
+    number1.binary = dec2Bin(inputs[j * 2]);
+    answer.binary = dec2Bin(outputs[j * 2]);
+
+    error = []
+
+    let nnOutput = nn.output();
+    for (let i = 0; i < NUM_OF_BITS; i++) {
+      error.push(nnOutput[i] - int(answer.binary[i]));
+      output.bitSuppliers[i] = () => round(nnOutput[i]);
+    }
+    nn.update(error);
+  }
+  nn.applyGradients();
+  nn.show();
+
+  output.show();
+  output.update(mouseX, mouseY);
 }
 
 function mousePressed() {
