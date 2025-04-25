@@ -3,9 +3,8 @@ from scipy.special import softmax
 import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
 
-seed = 3
+seed = 31
 torch.manual_seed(seed)
 
 # If using CUDA
@@ -20,7 +19,6 @@ torch.backends.cudnn.benchmark = False
 
 def tableOperator(A:torch.Tensor, B:torch.Tensor) -> torch.Tensor: 
     result = torch.empty((16,) + A.shape, device=A.device)
-
     # Perform the logical operations
     result[0]  = 0                                         # 0:False
     result[1]  = A * B                                     # 1:A ∧ B
@@ -38,7 +36,6 @@ def tableOperator(A:torch.Tensor, B:torch.Tensor) -> torch.Tensor:
     result[13] = 1 - A + A * B                             # 13:A ⇒ B
     result[14] = 1 - A * B                                 # 14:¬(A ∧ B)
     result[15] = 1                                         # 15:True
-
     return result
 
 def derivativeA(A:torch.Tensor, B:torch.Tensor) -> torch.Tensor: 
@@ -66,7 +63,6 @@ def derivativeA(A:torch.Tensor, B:torch.Tensor) -> torch.Tensor:
 def derivativeB(A:torch.Tensor, B:torch.Tensor) -> torch.Tensor: 
     result = torch.empty((16,) + A.shape, device=A.device)
 
-
     # Perform derivative calculations for B (corresponding to each operation)
     result[0]  = 0                                         # 0:False
     result[1]  = A                                         # 1:A ∧ B
@@ -93,84 +89,89 @@ def dec2Bin(dec):
         dec //= 2
     bin = (8 - len(bin)) * "0" + bin
     return bin
-    
-class Nueron: 
-    def __init__(self, a_index, b_index):
-        self.a_index = a_index
-        self.b_index = b_index
-        self.weights = torch.randn(16).to(device)
 
-    def output(self, A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
-        # Compute the probabilities using the softmax function
-        self.probabilities = torch.softmax(self.weights, dim=0).unsqueeze(1)  # Same as [:, np.newaxis] in numpy
+class Adam:
+    def __init__(self, learning_rate=0.01, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        self.learning_rate = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.m = None  # Initialize first moment vector
+        self.v = None  # Initialize second moment vector
+        self.t = 0      # Initialize timestep
 
-        # Compute the weight gradients using the tableOperator function (modified for PyTorch)
-        self.weight_gradient = tableOperator(A, B)
+    def update(self, params, grads):
+        if self.m is None:
+            self.m = [torch.zeros_like(grad) for grad in grads]
+            self.v = [torch.zeros_like(grad) for grad in grads]
 
-        # Compute deltas for A and B using their respective derivatives
-        self.a_delta = derivativeA(A, B) * self.probabilities
-        self.b_delta = derivativeB(A, B) * self.probabilities
+        self.t += 1
 
-        # Compute the result by summing over the weight gradients, multiplied by the probabilities
-        result = torch.sum(self.weight_gradient * self.probabilities, dim=0)
+        updated_params = []
+        for i, (param, grad) in enumerate(zip(params, grads)):
+            self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * grad
+            self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * grad**2
 
-        return result
-    def update_weights(self, lr):
-        grads = torch.mean(self.weight_gradient, axis=1)
+            m_corrected = self.m[i] / (1 - self.beta1**self.t)
+            v_corrected = self.v[i] / (1 - self.beta2**self.t)
 
-        self.weights -= grads * lr
+            param_update = self.learning_rate * m_corrected / (torch.sqrt(v_corrected) + self.epsilon)
+            updated_param = param - param_update
+            updated_params.append(updated_param)
+        return updated_params
 
 class Layer:
     def __init__(self, size, prev_size):
         self.size = size
-        self.layer = []
         self.prev_size = prev_size
-        self.lr = 5
-        for i in range(size):
-            indexA = torch.randint(0, prev_size, (1,), device=device).item()
-            indexB = torch.randint(0, prev_size - 1, (1,), device=device).item()
+        self.lr = 0.01
 
-            if (indexA == indexB):
-                indexB = prev_size - 1
-
-            self.layer.append(Nueron(indexA, indexB))
-    def layer_output(self, prev_layer_output: torch.Tensor) -> torch.Tensor:
-        # Initialize the output tensor
-        layer_output = torch.zeros((self.size, prev_layer_output.shape[1]), device=prev_layer_output.device)
-
-        # Loop through each layer and calculate the output
-        for i in range(self.size):
-            layer_output[i] = self.layer[i].output(prev_layer_output[self.layer[i].a_index], prev_layer_output[self.layer[i].b_index])
+        self.optimizer = Adam()
+        self.input_A_weights = torch.randn(size, prev_size).to(device)
+        self.input_B_weights = torch.randn(size, prev_size).to(device)
+    
         
+        self.table_weights = torch.randn(16, size).to(device)
+
+    def layer_output(self, prev_layer_output: torch.Tensor) -> torch.Tensor:
+        self.prev_layer_output = prev_layer_output
+        self.table_probs = torch.softmax(self.table_weights, dim=0)
+        self.input_A_probs = torch.softmax(self.input_A_weights, dim=1)
+        self.input_B_probs = torch.softmax(self.input_B_weights, dim=1)
+
+        a_inputs = torch.matmul(self.input_A_probs, prev_layer_output)
+        b_inputs = torch.matmul(self.input_B_probs, prev_layer_output)
+
+        self.table_output = tableOperator(a_inputs, b_inputs)
+        self.a_delta = torch.sum(derivativeA(a_inputs, b_inputs) * self.table_probs.unsqueeze(-1), dim=0)
+        self.b_delta = torch.sum(derivativeB(a_inputs, b_inputs) * self.table_probs.unsqueeze(-1), dim=0)
+
+        layer_output = torch.sum(self.table_output * self.table_probs.unsqueeze(-1), dim=0)
         return layer_output
 
     def update_weight_delta(self, error: torch.Tensor):
-        for i in range(self.size):
-            # Element-wise multiplication for weight gradients and error
-            self.layer[i].weight_gradient *= error[i]
-            # Update weights with learning rate (e.g., 0.1)
-            self.layer[i].update_weights(self.lr)
-            self.lr *= .99
+        table_weight_error = self.table_output * error.unsqueeze(0)
+        table_weight_delta = torch.sum(table_weight_error, dim=-1)
+        
+        self.a_error = self.a_delta * error
+        self.b_error = self.b_delta * error
+
+        input_a_weight_delta = torch.matmul(self.a_error, self.prev_layer_output.T)
+        input_b_weight_delta = torch.matmul(self.b_error, self.prev_layer_output.T)
+
+        new_parameters = self.optimizer.update(
+            [self.table_weights, self.input_A_weights, self.input_B_weights],
+            [table_weight_delta, input_a_weight_delta, input_b_weight_delta]
+        )
+        
+        self.table_weights = new_parameters[0]
+        self.input_A_weights = new_parameters[1]
+        self.input_B_weights = new_parameters[2]
 
 
     def prev_layer_error(self, error: torch.Tensor) -> torch.Tensor:
         # Initialize the index count and previous layer error tensors
-        index_count = torch.zeros(self.prev_size, device=error.device, dtype=torch.int)
-        prev_layer_error = torch.zeros((self.prev_size, error.shape[1]), device=error.device)
-
-        # Loop through each layer and calculate the previous layer's error
-        for i in range(self.size):
-            # Element-wise multiplication for delta values and error
-            self.layer[i].a_delta *= error[i]
-            self.layer[i].b_delta *= error[i]
-
-            # Update index count and previous layer error
-            index_count[self.layer[i].a_index] += 1
-            index_count[self.layer[i].b_index] += 1
-
-            prev_layer_error[self.layer[i].a_index] += torch.sum(self.layer[i].a_delta, dim=0)
-            prev_layer_error[self.layer[i].b_index] += torch.sum(self.layer[i].b_delta, dim=0)
-
+        prev_layer_error = torch.matmul(self.input_A_probs.T, self.a_error) + torch.matmul(self.input_B_probs.T, self.b_error)
         return prev_layer_error
 
 
@@ -227,19 +228,18 @@ batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device)  # sha
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) # shape (8, 4)
 
 # Initialize Neural Network (assuming you've implemented the class as before)
-network = NeuralNetwork([8, 64, 64, 644, 64, 64, 64, 8, 8])
+network = NeuralNetwork([8, 8, 8, 8, 8, 8, 8, 8, 8, 8])
 
-epochs = 1000
+epochs = 3000
 past_error = 10000
-
 for epoch in range(epochs):
     # Forward pass
     output = network.forward(batch_inputs.T)  # Transpose to match input shape
     error = output - batch_targets.T
     
     # Check for convergence (stop if error increases)
-    if torch.sum(error * error) > past_error:
-        break
+    # if torch.sum(error * error) > past_error:
+    #     break
     print("Error:", torch.sum(error * error).item())  # .item() to get the Python scalar value
     past_error = torch.sum(error * error).item()
     
