@@ -1,10 +1,14 @@
 from scipy.special import softmax
 
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
 
-seed = 31
+seed = 3141
 torch.manual_seed(seed)
 
 # If using CUDA
@@ -90,166 +94,126 @@ def dec2Bin(dec):
     bin = (8 - len(bin)) * "0" + bin
     return bin
 
-class Adam:
-    def __init__(self, learning_rate=0.01, beta1=0.9, beta2=0.999, epsilon=1e-8):
-        self.learning_rate = learning_rate
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.epsilon = epsilon
-        self.m = None  # Initialize first moment vector
-        self.v = None  # Initialize second moment vector
-        self.t = 0      # Initialize timestep
+class GradFactor(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, f):
+        ctx.f = f
+        return x
 
-    def update(self, params, grads):
-        if self.m is None:
-            self.m = [torch.zeros_like(grad) for grad in grads]
-            self.v = [torch.zeros_like(grad) for grad in grads]
+    @staticmethod
+    def backward(ctx, grad_y):
+        return grad_y * ctx.f, None
+def apply_weight_dropout(weights, dropout_rate):
+    if dropout_rate == 0:
+        return weights
 
-        self.t += 1
+    mask = (torch.rand_like(weights) > dropout_rate)
+    dropped_weights = weights.masked_fill(mask == 0, float('-inf'))
+    return dropped_weights
 
-        updated_params = []
-        for i, (param, grad) in enumerate(zip(params, grads)):
-            self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * grad
-            self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * grad**2
-
-            m_corrected = self.m[i] / (1 - self.beta1**self.t)
-            v_corrected = self.v[i] / (1 - self.beta2**self.t)
-
-            param_update = self.learning_rate * m_corrected / (torch.sqrt(v_corrected) + self.epsilon)
-            updated_param = param - param_update
-            updated_params.append(updated_param)
-        return updated_params
-
-class Layer:
-    def __init__(self, size, prev_size):
+class LogicLayer(nn.Module):
+    def __init__(self, prev_size, size):
+        super().__init__()
         self.size = size
         self.prev_size = prev_size
-        self.lr = 0.01
 
-        self.optimizer = Adam()
-        self.input_A_weights = torch.randn(size, prev_size).to(device)
-        self.input_B_weights = torch.randn(size, prev_size).to(device)
-    
-        
-        self.table_weights = torch.randn(16, size).to(device)
+        self.input_A_weights = nn.Parameter(torch.randn(size, prev_size))
+        self.input_B_weights = nn.Parameter(torch.randn(size, prev_size))
+        self.table_weights = nn.Parameter(torch.randn(16, size))  # 16 logic ops per neuron
 
-    def layer_output(self, prev_layer_output: torch.Tensor) -> torch.Tensor:
-        self.prev_layer_output = prev_layer_output
-        self.table_probs = torch.softmax(self.table_weights, dim=0)
-        self.input_A_probs = torch.softmax(self.input_A_weights, dim=1)
-        self.input_B_probs = torch.softmax(self.input_B_weights, dim=1)
+    def forward(self, prev_layer_output):
+        prev_layer_output = GradFactor.apply(prev_layer_output, 10)
+        # Softmax for differentiable input selectors
+        input_A_probs = F.softmax(self.input_A_weights, dim=1)
+        input_B_probs = F.softmax(self.input_B_weights, dim=1)
+        table_probs = F.softmax(self.table_weights, dim=0)
 
-        a_inputs = torch.matmul(self.input_A_probs, prev_layer_output)
-        b_inputs = torch.matmul(self.input_B_probs, prev_layer_output)
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 10)
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 10)
 
-        self.table_output = tableOperator(a_inputs, b_inputs)
-        self.a_delta = torch.sum(derivativeA(a_inputs, b_inputs) * self.table_probs.unsqueeze(-1), dim=0)
-        self.b_delta = torch.sum(derivativeB(a_inputs, b_inputs) * self.table_probs.unsqueeze(-1), dim=0)
+        table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
+        output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
 
-        layer_output = torch.sum(self.table_output * self.table_probs.unsqueeze(-1), dim=0)
-        return layer_output
-
-    def update_weight_delta(self, error: torch.Tensor):
-        table_weight_error = self.table_output * error.unsqueeze(0)
-        table_weight_delta = torch.sum(table_weight_error, dim=-1)
-        
-        self.a_error = self.a_delta * error
-        self.b_error = self.b_delta * error
-
-        input_a_weight_delta = torch.matmul(self.a_error, self.prev_layer_output.T)
-        input_b_weight_delta = torch.matmul(self.b_error, self.prev_layer_output.T)
-
-        new_parameters = self.optimizer.update(
-            [self.table_weights, self.input_A_weights, self.input_B_weights],
-            [table_weight_delta, input_a_weight_delta, input_b_weight_delta]
-        )
-        
-        self.table_weights = new_parameters[0]
-        self.input_A_weights = new_parameters[1]
-        self.input_B_weights = new_parameters[2]
-
-
-    def prev_layer_error(self, error: torch.Tensor) -> torch.Tensor:
-        # Initialize the index count and previous layer error tensors
-        prev_layer_error = torch.matmul(self.input_A_probs.T, self.a_error) + torch.matmul(self.input_B_probs.T, self.b_error)
-        return prev_layer_error
-
-
+        return output
 
     
-class NeuralNetwork:
-    def __init__(self, model_size):
-        self.layers = []
-        # Create layers (excluding the input and output layers)
-        for i in range(len(model_size) - 2):
-            layer_size = model_size[i+1]
-            self.layers.append(Layer(layer_size, model_size[i]))
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        hidden = []
-        # First layer output
-        hidden.append(self.layers[0].layer_output(input))
-        
-        # Iterate through the rest of the layers
-        if len(self.layers) > 1:
-            for i in range(1, len(self.layers)):
-                hidden.append(self.layers[i].layer_output(hidden[-1]))
-        
-        return hidden[-1]
-
-    def backward_prop(self, error: torch.Tensor):
-        # Normalize the initial error (from the output layer)
-        error = error / (torch.norm(error) + 1e-8)
-        
-        # Start from the output layer and propagate backward
-        for i in reversed(range(len(self.layers))):
-            # Update the weight deltas for the current layer
-            self.layers[i].update_weight_delta(error)
-            
-            # If not the first layer, compute the error to propagate to the previous layer
-            if i > 0:
-                error = self.layers[i].prev_layer_error(error)
-                error = error / (torch.norm(error) + 1e-8)
-
-
 # Create batch for 0 through 7
 batch_inputs = []
 batch_targets = []
 
-for i in range(256):
+for i in range(200):
     bin_input = list(dec2Bin(i))
-    bin_target = list(dec2Bin((i + 1) % 16))  # wrap-around for 4-bit
+    bin_target = list(dec2Bin((i + 1) % 256)) 
 
     batch_inputs.append([float(x) for x in bin_input])
     batch_targets.append([float(x) for x in bin_target])
 
 # Convert lists to PyTorch tensors
-batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device)  # shape (8, 4)
-batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) # shape (8, 4)
+batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
+batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
 
-# Initialize Neural Network (assuming you've implemented the class as before)
-network = NeuralNetwork([8, 8, 8, 8, 8, 8, 8, 8, 8, 8])
+model = torch.nn.Sequential(
+    LogicLayer(8, 64),
+    LogicLayer(64, 64),
+    LogicLayer(64, 64),
+    LogicLayer(64, 64),
+    LogicLayer(64, 64),
+    LogicLayer(64, 64),
+    LogicLayer(64, 8),
+).to(device)
 
-epochs = 3000
-past_error = 10000
+
+# Optimizer and loss
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
+criterion = nn.MSELoss()
+
+error_over_time = []
+# Training loop
+epochs = 15000
 for epoch in range(epochs):
-    # Forward pass
-    output = network.forward(batch_inputs.T)  # Transpose to match input shape
-    error = output - batch_targets.T
+    optimizer.zero_grad()
     
-    # Check for convergence (stop if error increases)
-    # if torch.sum(error * error) > past_error:
-    #     break
-    print("Error:", torch.sum(error * error).item())  # .item() to get the Python scalar value
-    past_error = torch.sum(error * error).item()
+    output = model(batch_inputs.T)
+    loss = criterion(output, batch_targets.T)
+
+    loss.backward()
+    optimizer.step()
+    error_over_time.append(loss.item())
+    print(f"Epoch {epoch}: Loss = {loss.item():.6f}")
     
-    # Backward pass (update weights)
-    network.backward_prop(error)
-print(batch_inputs.device)
-# Final output and error calculation
-output = network.forward(batch_inputs.T)
-error = output - batch_targets.T
-print(torch.sum(error * error).item())
-print("Network Input:", batch_inputs)
-print("Network Output:", output.T)
-print("Target Output:", batch_targets)
+batch_inputs = []
+batch_targets = []
+   
+for i in range(255):
+    bin_input = list(dec2Bin(i))
+    bin_target = list(dec2Bin((i + 1) % 256)) 
+
+    batch_inputs.append([float(x) for x in bin_input])
+    batch_targets.append([float(x) for x in bin_target])
+batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
+batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
+    
+# Final output
+with torch.no_grad():
+    output = model(batch_inputs.T)
+    final_loss = criterion(output, batch_targets.T).item()
+    
+torch.set_printoptions(precision=2, sci_mode=False)
+print(f"\nFinal Loss: {final_loss:.6f}")
+print(batch_targets[-5:])
+print("Sample Output:\n", torch.round(output.T[-5:]))
+
+
+name, param = list(model.named_parameters())[0]
+print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
+name, param = list(model.named_parameters())[1]
+print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
+# for name, param in model.named_parameters():
+#     print(f"Layer: {name}, Weights: { (param.data)}")
+
+x_values = range(len(error_over_time))
+
+fig, ax = plt.subplots()
+
+ax.plot(x_values, error_over_time)
+plt.show()
