@@ -141,7 +141,7 @@ class LogicLayer(nn.Module):
 batch_inputs = []
 batch_targets = []
 
-for i in range(200):
+for i in range(254):
     bin_input = list(dec2Bin(i))
     bin_target = list(dec2Bin((i + 1) % 256)) 
 
@@ -154,6 +154,7 @@ batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device)
 
 model = torch.nn.Sequential(
     LogicLayer(8, 64),
+    LogicLayer(64, 64),
     LogicLayer(64, 64),
     LogicLayer(64, 64),
     LogicLayer(64, 64),
