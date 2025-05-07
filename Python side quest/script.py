@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-seed = 3141
+seed = 3
 torch.manual_seed(seed)
 
 # If using CUDA
@@ -103,6 +103,7 @@ class GradFactor(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_y):
         return grad_y * ctx.f, None
+    
 def apply_weight_dropout(weights, dropout_rate):
     if dropout_rate == 0:
         return weights
@@ -110,6 +111,7 @@ def apply_weight_dropout(weights, dropout_rate):
     mask = (torch.rand_like(weights) > dropout_rate)
     dropped_weights = weights.masked_fill(mask == 0, float('-inf'))
     return dropped_weights
+torch.set_printoptions(precision=2, sci_mode=False)
 
 class LogicLayer(nn.Module):
     def __init__(self, prev_size, size):
@@ -122,18 +124,42 @@ class LogicLayer(nn.Module):
         self.table_weights = nn.Parameter(torch.randn(16, size))  # 16 logic ops per neuron
 
     def forward(self, prev_layer_output):
-        prev_layer_output = GradFactor.apply(prev_layer_output, 10)
+        if not torch.is_grad_enabled():
+            a_indices = torch.argmax(self.input_A_weights, dim=1)
+            b_indices = torch.argmax(self.input_B_weights, dim=1)
+            
+            table_indices = torch.argmax(self.table_weights, dim=0)
+  
+            input_A_probs = torch.nn.functional.one_hot(a_indices, num_classes=self.input_A_weights.size(1)).float()
+            input_B_probs = torch.nn.functional.one_hot(b_indices, num_classes=self.input_B_weights.size(1)).float()
+            table_probs = torch.nn.functional.one_hot(table_indices, num_classes=self.table_weights.size(0)).float().T
+
+            a_inputs = torch.matmul(input_A_probs, prev_layer_output)
+            b_inputs = torch.matmul(input_B_probs, prev_layer_output)
+            
+            table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
+            output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
+            
+            return output
+            
+        prev_layer_output = GradFactor.apply(prev_layer_output, 1)
         # Softmax for differentiable input selectors
         input_A_probs = F.softmax(self.input_A_weights, dim=1)
         input_B_probs = F.softmax(self.input_B_weights, dim=1)
         table_probs = F.softmax(self.table_weights, dim=0)
 
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 10)
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 10)
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 1)
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 1)
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
         output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
 
+        try:
+            def hook(grad):
+                return grad
+            output.register_hook(hook)
+        except:
+            pass
         return output
 
     
@@ -143,7 +169,7 @@ batch_targets = []
 
 for i in range(254):
     bin_input = list(dec2Bin(i))
-    bin_target = list(dec2Bin((i + 1) % 256)) 
+    bin_target = list(dec2Bin((i) % 256)) 
 
     batch_inputs.append([float(x) for x in bin_input])
     batch_targets.append([float(x) for x in bin_target])
@@ -153,32 +179,38 @@ batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device)
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
 
 model = torch.nn.Sequential(
-    LogicLayer(8, 64),
-    LogicLayer(64, 64),
-    LogicLayer(64, 64),
-    LogicLayer(64, 64),
-    LogicLayer(64, 64),
-    LogicLayer(64, 64),
-    LogicLayer(64, 64),
-    LogicLayer(64, 8),
+    LogicLayer(8, 8)
 ).to(device)
 
 
 # Optimizer and loss
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
+optimizer = torch.optim.Adam(model.parameters(), lr=0.1, betas=[0.95, 0.999])
 criterion = nn.MSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 15000
+epochs = 2000
+
 for epoch in range(epochs):
+    epoch += 1
+    # After 100 epochs, add another LogicLayer
+    # if epoch % 500 == 0 and epoch < 4000:
+    #     print("Appending new LogicLayer...")
+    #     # Detach old model and wrap in new Sequential
+    #     model = torch.nn.Sequential(
+    #         model,  # existing layers
+    #         LogicLayer(8, 8).to(device)  # new layer
+    #     ).to(device)
+
+    #     # Reset optimizer for new parameters
+    #     optimizer = torch.optim.Adam(model.parameters(), lr=0.1, betas=[0.95, 0.999])
+
     optimizer.zero_grad()
-    
     output = model(batch_inputs.T)
     loss = criterion(output, batch_targets.T)
-
     loss.backward()
     optimizer.step()
+
     error_over_time.append(loss.item())
     print(f"Epoch {epoch}: Loss = {loss.item():.6f}")
     
@@ -193,24 +225,28 @@ for i in range(255):
     batch_targets.append([float(x) for x in bin_target])
 batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
-    
+model.training = False
+
 # Final output
 with torch.no_grad():
     output = model(batch_inputs.T)
-    final_loss = criterion(output, batch_targets.T).item()
-    
-torch.set_printoptions(precision=2, sci_mode=False)
+    final_loss = criterion(torch.round(output), batch_targets.T).item()
 print(f"\nFinal Loss: {final_loss:.6f}")
-print(batch_targets[-5:])
-print("Sample Output:\n", torch.round(output.T[-5:]))
+print(batch_targets[-10:])
+print("Sample Output:\n", output.T[-10:])
 
 
-name, param = list(model.named_parameters())[0]
-print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
-name, param = list(model.named_parameters())[1]
-print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
-# for name, param in model.named_parameters():
-#     print(f"Layer: {name}, Weights: { (param.data)}")
+# name, param = list(model.named_parameters())[0]
+# print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
+# name, param = list(model.named_parameters())[1]
+# print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
+# name, param = list(model.named_parameters())[2]
+# print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=0)}")
+for name, param in model.named_parameters():
+    if "input" in name:
+        print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
+    elif "table" in name:
+        print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=0)}")
 
 x_values = range(len(error_over_time))
 
