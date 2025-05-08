@@ -10,4 +10,10 @@ class NueralNetwork {
         }
         return prev_output;
     }
+    show() {
+        for (let i = 0; i < this.layers.length; i++) {
+            this.layers[i].show();
+            this.layers[i].showGUI();
+        }
+    }
 }
