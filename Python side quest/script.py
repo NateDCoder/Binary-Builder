@@ -143,14 +143,14 @@ class LogicLayer(nn.Module):
             
             return output
             
-        prev_layer_output = GradFactor.apply(prev_layer_output, 4)
+        prev_layer_output = GradFactor.apply(prev_layer_output, 1)
         # Softmax for differentiable input selectors
         input_A_probs = F.softmax(self.input_A_weights, dim=1)
         input_B_probs = F.softmax(self.input_B_weights, dim=1)
         table_probs = F.softmax(self.table_weights, dim=0)
 
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 4)
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 4)
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 1)
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 1)
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
         output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
@@ -173,20 +173,28 @@ class BinaryToDecimalMSELoss(nn.Module):
         # Compute decimal values
         # print(output.shape, target.shape, self.weights.shape)
         # print(output.T[0], target.T[0], self.weights)
-        output_decimal = (output * self.weights)
-        target_decimal = (target * self.weights)
+        error_rate = 1
+        output_decimal = (output * error_rate)
+        target_decimal = (target * error_rate)
         return F.mse_loss(output_decimal, target_decimal)
     
 # Create batch for 0 through 7
 batch_inputs = []
 batch_targets = []
-for _ in range(10):
-    for i in range(250):
-        bin_input = list(dec2Bin(i))
-        bin_target = list(dec2Bin((i+1) % 256)) 
+# for _ in range(10):
+for i in range(250):
+    bin_input = list(dec2Bin(i))
+    bin_target = list(dec2Bin((i+1) % 256)) 
 
-        batch_inputs.append([float(x) for x in bin_input])
-        batch_targets.append([float(x) for x in bin_target])
+    batch_inputs.append([float(x) for x in bin_input])
+    batch_targets.append([float(x) for x in bin_target])
+for i in range(5):
+    i+=2
+    bin_input = list(dec2Bin(2**i - 1))
+    bin_target = list(dec2Bin(2**i))
+    
+    batch_inputs.append([float(x) for x in bin_input])
+    batch_targets.append([float(x) for x in bin_target])
 
 # Convert lists to PyTorch tensors
 batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
@@ -203,7 +211,7 @@ criterion = BinaryToDecimalMSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 800
+epochs = 2000
 
 
 batch_size = len(batch_inputs) // 10  # for 5 batches
@@ -221,7 +229,7 @@ for epoch in range(epochs):
     inputs_shuffled = batch_inputs[indices]
     targets_shuffled = batch_targets[indices]
     # After 100 epochs, add another LogicLayer
-    if epoch % 60 == 0 and epoch < 480:
+    if epoch % 30 == 0 and epoch < 240:
         print("Appending new LogicLayer...")
         # Detach old model and wrap in new Sequential
         model = torch.nn.Sequential(
@@ -231,6 +239,8 @@ for epoch in range(epochs):
         
         # Reset optimizer for new parameters
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
+    
+    batch_losses = []
     for i in range(0, len(batch_inputs), batch_size):
         batch_input = inputs_shuffled[i:i+batch_size]
         batch_target = targets_shuffled[i:i+batch_size]
@@ -246,15 +256,30 @@ for epoch in range(epochs):
         optimizer.step()
 
         error_over_time.append(loss.item())
+        
+        batch_losses.append((i, loss.item()))
+        
         try:
-            _, param = list(model.named_parameters())[0]
+            _, param = list(model.named_parameters())[1]
             param = F.softmax(param.data, dim=1)
             for i in range(len(param[0])):
-                tableOperatorOverTime[i].append(float(param[6][i]))
+                tableOperatorOverTime[i].append(float(param[3][i]))
         except:
            for i in range(8):
                 tableOperatorOverTime[i].append(0) 
+    top_n = 1
+    worst_batches_input = batch_inputs[-5:]
+    worst_batches_targets = batch_targets[-5:]
 
+    print(f"Re-training top {top_n} worst batches...")
+    for _ in range(10):
+        optimizer.zero_grad()
+        output = model(worst_batches_input.T)
+        loss = criterion(output, worst_batches_targets.T)
+        loss.backward()
+        optimizer.step()
+
+        error_over_time.append(loss.item())
     print(f"Epoch {epoch+1}: Last Batch Loss = {loss.item():.6f}")
 
 # print(output_grads)
@@ -302,7 +327,7 @@ fig, ax = plt.subplots()
 
 ax.plot(x_values, error_over_time)
 for i, value in enumerate(tableOperatorOverTime):
-    ax.plot(x_values, value, label=f'Line {i}')
+    ax.plot(range(len(value)), value, label=f'Line {i}')
 
 ax.legend()
 plt.show()
