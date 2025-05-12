@@ -4,26 +4,29 @@ class LogicLayer {
         this.size = size;
         this.prev_size = prev_size;
 
-        this.input_A_probs = input_A_probs;
-        this.input_B_probs = input_B_probs;
-        this.table_probs = table_probs;
+        this.input_A_probs = softmax(input_A_probs, 1);
+        this.input_B_probs = softmax(input_B_probs, 1);
+        this.table_probs = softmax(table_probs, 0);
 
         this.positions = [];
         this.startPositions = [];
-
-        for (let i = 0; i < NUM_OF_BITS; i++) {
+        console.log(this.input_A_probs.length, this.input_A_probs[0].length);
+        for (let i = 0; i < this.input_A_probs[0].length; i++) {
             if (index == 0) {
                 this.startPositions.push(
-                    createVector(number1.position.x + 30 / 2, number1.position.y + i * 30)
+                    createVector(number1.position.x + 30 / 2, number1.position.y + (i + 4) * 30)
                 );
             } else {
-                this.startPositions.push(createVector(100 + (index-1) * 50, (i + 2) * 50));
+                this.startPositions.push(createVector(150 + (index - 1) * 100, (i + 2) * 50));
             }
-            this.positions.push(createVector(100 + index * 50, (i + 2) * 50));
+        }
+        for (let i = 0; i < this.input_A_probs.length; i++) {
+            this.positions.push(createVector(150 + index * 100, (i + 2) * 50));
         }
     }
 
     forward(prev_layer_output) {
+        console.log(transpose(prev_layer_output));
         this.prev_layer_output = prev_layer_output;
         this.a_inputs = matmul(this.input_A_probs, prev_layer_output);
         this.b_inputs = matmul(this.input_B_probs, prev_layer_output);
@@ -35,8 +38,14 @@ class LogicLayer {
     }
 
     show() {
-        for (let i = 0; i < NUM_OF_BITS; i++) {
-            for (let j = 0; j < NUM_OF_BITS; j++) {
+        console.log(
+            this.input_A_probs[0].length,
+            this.input_A_probs.length,
+            this.startPositions.length,
+            this.positions.length
+        );
+        for (let i = 0; i < this.input_A_probs[0].length; i++) {
+            for (let j = 0; j < this.input_A_probs.length; j++) {
                 if (!(this.table_probs[5][j] > 0.8)) {
                     stroke(
                         lerpColor(
@@ -69,11 +78,13 @@ class LogicLayer {
                     );
                 }
             }
+        }
+        for (let j = 0; j < this.input_A_probs.length; j++) {
             fill(
-                lerpColor(color(100), color(255, 255, 0), transpose(this.result)[currentIndex][i])
+                lerpColor(color(100), color(255, 255, 0), transpose(this.result)[currentIndex][j])
             );
             noStroke();
-            circle(this.positions[i].x, this.positions[i].y, 15);
+            circle(this.positions[j].x, this.positions[j].y, 15);
         }
         // console.log(transpose(this.a_inputs)[currentIndex]);
         // console.log(transpose(this.result)[currentIndex])
@@ -90,7 +101,7 @@ class LogicLayer {
     showGUI() {
         noStroke();
         fill(180);
-        for (let i = 0; i < NUM_OF_BITS; i++) {
+        for (let i = 0; i < this.positions.length; i++) {
             if (dist(mouseX, mouseY, this.positions[i].x, this.positions[i].y) < 15) {
                 rect(this.positions[i].x, this.positions[i].y, 50, 50);
                 fill(0);

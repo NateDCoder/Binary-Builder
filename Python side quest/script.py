@@ -10,7 +10,7 @@ import math
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-seed = 315
+seed = 3
 torch.manual_seed(seed)
 
 # If using CUDA
@@ -93,7 +93,7 @@ def dec2Bin(dec):
     while (dec > 0):
         bin = str(dec % 2) + bin
         dec //= 2
-    bin = (8 - len(bin)) * "0" + bin
+    bin = (4 - len(bin)) * "0" + bin
     return bin
 
 class GradFactor(torch.autograd.Function):
@@ -143,24 +143,18 @@ class LogicLayer(nn.Module):
             
             return output
             
-        prev_layer_output = GradFactor.apply(prev_layer_output, 1)
+        prev_layer_output = GradFactor.apply(prev_layer_output, 2)
         # Softmax for differentiable input selectors
         input_A_probs = F.softmax(self.input_A_weights, dim=1)
         input_B_probs = F.softmax(self.input_B_weights, dim=1)
         table_probs = F.softmax(self.table_weights, dim=0)
 
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 1)
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 1)
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 2)
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 2)
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
         output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
 
-        try:
-            def hook(grad):
-                return grad
-            output.register_hook(hook)
-        except:
-            pass
         return output
 class BinaryToDecimalMSELoss(nn.Module):
     def __init__(self):
@@ -181,37 +175,54 @@ class BinaryToDecimalMSELoss(nn.Module):
 # Create batch for 0 through 7
 batch_inputs = []
 batch_targets = []
-# for _ in range(10):
-for i in range(250):
-    bin_input = list(dec2Bin(i))
-    bin_target = list(dec2Bin((i+1) % 256)) 
+for _ in range(100):
+    for i in range(15):
+        bin_input = list(dec2Bin(i))
+        bin_target = list(dec2Bin((i + 1) % 256)) 
 
-    batch_inputs.append([float(x) for x in bin_input])
-    batch_targets.append([float(x) for x in bin_target])
-for i in range(5):
-    i+=2
-    bin_input = list(dec2Bin(2**i - 1))
-    bin_target = list(dec2Bin(2**i))
+        batch_inputs.append([float(x) for x in bin_input])
+        batch_targets.append([float(x) for x in bin_target])
+# for i in range(5):
+#     i+=2
+#     bin_input = list(dec2Bin(2**i - 1))
+#     bin_target = list(dec2Bin(2**i))
     
-    batch_inputs.append([float(x) for x in bin_input])
-    batch_targets.append([float(x) for x in bin_target])
+#     batch_inputs.append([float(x) for x in bin_input])
+#     batch_targets.append([float(x) for x in bin_target])
 
 # Convert lists to PyTorch tensors
 batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
 
 model = torch.nn.Sequential(
-    LogicLayer(8, 8)
+    LogicLayer(4, 8),
+    LogicLayer(8, 8),
+    LogicLayer(8, 4)
 ).to(device)
 
 
 # Optimizer and loss
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
+
+# def apply_entropy(param, ):
+#     def hook(grad, p=param):
+#         if p.shape[0] == 16:
+#             probs = torch.softmax(param,  dim=0)
+#         else:
+#             probs = torch.softmax(param,  dim=1)
+#         entropy = 1 - torch.mean(probs * torch.log(probs)) * grad.shape[0] * 0.00
+#         return grad * entropy
+#     param.register_hook(hook)
+    
+# for param in model.parameters():
+#     if param.requires_grad:
+#         apply_entropy(param)
+
 criterion = BinaryToDecimalMSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 2000
+epochs = 1000
 
 
 batch_size = len(batch_inputs) // 10  # for 5 batches
@@ -224,21 +235,21 @@ for i in range(8):
     
 for epoch in range(epochs):
     epoch += 1
-    # Shuffle indices
+    # Shuffle indices     
     indices = torch.randperm(len(batch_inputs))
     inputs_shuffled = batch_inputs[indices]
     targets_shuffled = batch_targets[indices]
     # After 100 epochs, add another LogicLayer
-    if epoch % 30 == 0 and epoch < 240:
-        print("Appending new LogicLayer...")
-        # Detach old model and wrap in new Sequential
-        model = torch.nn.Sequential(
-            model,  # existing layers
-            LogicLayer(8, 8).to(device)  # new layer
-        ).to(device)
+    # if epoch % 50 == 0 and epoch < 100:
+    #     print("Appending new LogicLayer...")
+    #     # Detach old model and wrap in new Sequential
+    #     model = torch.nn.Sequential(
+    #         model,  # existing layers
+    #         LogicLayer(4, 4).to(device)  # new layer
+    #     ).to(device)
         
-        # Reset optimizer for new parameters
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
+    #     # Reset optimizer for new parameters
+    #     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
     
     batch_losses = []
     for i in range(0, len(batch_inputs), batch_size):
@@ -267,26 +278,26 @@ for epoch in range(epochs):
         except:
            for i in range(8):
                 tableOperatorOverTime[i].append(0) 
-    top_n = 1
-    worst_batches_input = batch_inputs[-5:]
-    worst_batches_targets = batch_targets[-5:]
+    # top_n = 1
+    # worst_batches_input = batch_inputs[-5:]
+    # worst_batches_targets = batch_targets[-5:]
 
-    print(f"Re-training top {top_n} worst batches...")
-    for _ in range(10):
-        optimizer.zero_grad()
-        output = model(worst_batches_input.T)
-        loss = criterion(output, worst_batches_targets.T)
-        loss.backward()
-        optimizer.step()
+    # print(f"Re-training top {top_n} worst batches...")
+    # for _ in range(10):
+    #     optimizer.zero_grad()
+    #     output = model(worst_batches_input.T)
+    #     loss = criterion(output, worst_batches_targets.T)
+    #     loss.backward()
+    #     optimizer.step()
 
-        error_over_time.append(loss.item())
+    #     error_over_time.append(loss.item())
     print(f"Epoch {epoch+1}: Last Batch Loss = {loss.item():.6f}")
 
 # print(output_grads)
 batch_inputs = []
 batch_targets = []
    
-for i in range(255):
+for i in range(15):
     bin_input = list(dec2Bin(i))
     bin_target = list(dec2Bin((i+1) % 256)) 
 
@@ -300,9 +311,10 @@ model.training = False
 with torch.no_grad():
     output = model(batch_inputs.T)
     final_loss = criterion(output, batch_targets.T).item()
+output = model(batch_inputs.T)
 print(f"\nFinal Loss: {final_loss:.6f}")
 print(batch_targets[:5])
-print("Sample Output:\n", output.T[:5])
+print("Sample Output:\n", output.T)
 
 
 # name, param = list(model.named_parameters())[0]
@@ -315,11 +327,11 @@ torch.set_printoptions(precision=2, sci_mode=False)
 i = 0
 for name, param in model.named_parameters():
     if "input_A_weights" in name:
-        print(f"const INPUT_A_PROBS_{math.floor(i/3)} = { F.softmax(param.data, dim=1)}")
+        print(f"const INPUT_A_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist()}")
     elif "input_B_weights" in name:
-        print(f"const INPUT_B_PROBS_{math.floor(i/3)} = { F.softmax(param.data, dim=1)}")
+        print(f"const INPUT_B_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist()}")
     elif "table" in name:
-        print(f"const TABLE_PROBS_{math.floor(i/3)} = { F.softmax(param.data, dim=0)}")
+        print(f"const TABLE_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist() }")
     i += 1
 x_values = range(len(error_over_time))
 

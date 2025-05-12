@@ -20,16 +20,14 @@ function setup() {
 
     contextMenu = new ContextMenu(menuOptions);
     nn = new NueralNetwork([
-        new LogicLayer(8, 8, INPUT_A_PROBS_0, INPUT_B_PROBS_0, TABLE_PROBS_0, 0),
+        new LogicLayer(4, 8, INPUT_A_PROBS_0, INPUT_B_PROBS_0, TABLE_PROBS_0, 0),
         new LogicLayer(8, 8, INPUT_A_PROBS_1, INPUT_B_PROBS_1, TABLE_PROBS_1, 1),
-        new LogicLayer(8, 8, INPUT_A_PROBS_2, INPUT_B_PROBS_2, TABLE_PROBS_2, 2),
-        new LogicLayer(8, 8, INPUT_A_PROBS_3, INPUT_B_PROBS_3, TABLE_PROBS_3, 3),
-        new LogicLayer(8, 8, INPUT_A_PROBS_4, INPUT_B_PROBS_4, TABLE_PROBS_4, 4),
-        new LogicLayer(8, 8, INPUT_A_PROBS_5, INPUT_B_PROBS_5, TABLE_PROBS_5, 5),
-        new LogicLayer(8, 8, INPUT_A_PROBS_6, INPUT_B_PROBS_6, TABLE_PROBS_6, 6),
-        new LogicLayer(8, 8, INPUT_A_PROBS_7, INPUT_B_PROBS_7, TABLE_PROBS_7, 7)
+        new LogicLayer(8, 4, INPUT_A_PROBS_2, INPUT_B_PROBS_2, TABLE_PROBS_2, 2),
     ]);
-    console.log(transpose(nn.forward(transpose(binaryInputs))))
+    let sliced = transpose(binaryInputs)
+        .slice(4, 8)
+        .map((row) => row.slice(0, 15));
+    console.log(transpose(nn.forward(sliced)));
 }
 
 function draw() {
