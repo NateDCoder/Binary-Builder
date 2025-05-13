@@ -10,7 +10,7 @@ import math
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-seed = 3
+seed = 31
 torch.manual_seed(seed)
 
 # If using CUDA
@@ -120,10 +120,14 @@ class LogicLayer(nn.Module):
         self.size = size
         self.prev_size = prev_size
 
-        self.input_A_weights = nn.Parameter(torch.randn(size, prev_size) * 0.05)
-        self.input_B_weights = nn.Parameter(torch.randn(size, prev_size) * 0.05)
-        self.table_weights = nn.Parameter(torch.randn(16, size)  * 0.05)  # 16 logic ops per neuron
+        self.input_A_weights = nn.Parameter(torch.empty(size, prev_size))
+        nn.init.kaiming_uniform_(self.input_A_weights, a=math.sqrt(5))
 
+        self.input_B_weights = nn.Parameter(torch.empty(size, prev_size))
+        nn.init.kaiming_uniform_(self.input_B_weights, a=math.sqrt(5))
+        
+        self.table_weights = nn.Parameter(torch.empty(16, size))  # 16 logic ops per neuron
+        nn.init.kaiming_uniform_(self.table_weights, a=math.sqrt(5))
     def forward(self, prev_layer_output):
         if not torch.is_grad_enabled():
             a_indices = torch.argmax(self.input_A_weights, dim=1)
@@ -148,7 +152,13 @@ class LogicLayer(nn.Module):
         input_A_probs = F.softmax(self.input_A_weights, dim=1)
         input_B_probs = F.softmax(self.input_B_weights, dim=1)
         table_probs = F.softmax(self.table_weights, dim=0)
-
+        
+        multiplier = 1 / torch.clamp(torch.sum(input_A_probs + input_B_probs, dim=0), 0, 1) - 1
+        
+        
+        input_A_probs = F.softmax(self.input_A_weights + multiplier.unsqueeze(0), dim=1)
+        input_B_probs = F.softmax(self.input_B_weights + multiplier.unsqueeze(0), dim=1)
+   
         a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 2)
         b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 2)
 
@@ -175,13 +185,13 @@ class BinaryToDecimalMSELoss(nn.Module):
 # Create batch for 0 through 7
 batch_inputs = []
 batch_targets = []
-for _ in range(100):
-    for i in range(15):
-        bin_input = list(dec2Bin(i))
-        bin_target = list(dec2Bin((i + 1) % 256)) 
+# for _ in range(100):
+for i in range(15):
+    bin_input = list(dec2Bin(i))
+    bin_target = list(dec2Bin((i + 1) % 256)) 
 
-        batch_inputs.append([float(x) for x in bin_input])
-        batch_targets.append([float(x) for x in bin_target])
+    batch_inputs.append([float(x) for x in bin_input])
+    batch_targets.append([float(x) for x in bin_target])
 # for i in range(5):
 #     i+=2
 #     bin_input = list(dec2Bin(2**i - 1))
@@ -195,9 +205,10 @@ batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device)
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
 
 model = torch.nn.Sequential(
-    LogicLayer(4, 8),
-    LogicLayer(8, 8),
-    LogicLayer(8, 4)
+    LogicLayer(4, 6),
+    LogicLayer(6, 6),
+    LogicLayer(6, 6),
+    LogicLayer(6, 4)
 ).to(device)
 
 
@@ -222,10 +233,10 @@ criterion = BinaryToDecimalMSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 1000
+epochs = 20000
 
 
-batch_size = len(batch_inputs) // 10  # for 5 batches
+batch_size = len(batch_inputs) // 1  # for 5 batches
 
 output_grads = []
 

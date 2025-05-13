@@ -8,6 +8,16 @@ class LogicLayer {
         this.input_B_probs = softmax(input_B_probs, 1);
         this.table_probs = softmax(table_probs, 0);
 
+        let multiplier = subtract1FromArray(
+            divArray(
+                1,
+                arrayClamp(matrixSum(matrixAdd(this.input_A_probs, this.input_B_probs), 0), 0, 1)
+            )
+        );
+        console.log(input_A_probs.length, input_A_probs[0].length, multiplier.length);
+        this.input_A_probs = softmax(arrayMatrixAddition(input_A_probs, multiplier), 1);
+        this.input_B_probs = softmax(arrayMatrixAddition(input_B_probs, multiplier), 1);
+
         this.positions = [];
         this.startPositions = [];
         console.log(this.input_A_probs.length, this.input_A_probs[0].length);
@@ -26,7 +36,6 @@ class LogicLayer {
     }
 
     forward(prev_layer_output) {
-        console.log(transpose(prev_layer_output));
         this.prev_layer_output = prev_layer_output;
         this.a_inputs = matmul(this.input_A_probs, prev_layer_output);
         this.b_inputs = matmul(this.input_B_probs, prev_layer_output);

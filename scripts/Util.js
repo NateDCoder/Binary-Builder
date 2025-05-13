@@ -51,6 +51,65 @@ function seededRandom(seed) {
 
 const rng = seededRandom(12345); // Seed value
 
+function arrayClamp(arr, minVal, maxVal) {
+    return arr.map((val) => Math.max(minVal, Math.min(maxVal, val)));
+}
+
+function divArray(number, array) {
+    return array.map((val) => number / val);
+}
+
+function subtract1FromArray(arr) {
+    return arr.map(val => val - 1);
+}
+
+function arrayMatrixAddition(matrix, arr) {
+    const rows = matrix.length;
+    const cols = matrix[0].length;
+
+    let result = [...Array(rows)].map((e) => Array(cols));
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            result[i][j] = matrix[i][j] + arr[j]
+        }
+    }
+    return result;
+}
+function matrixSum(matrix, dim) {
+    if (dim === 0) {
+        // Sum along columns
+        const cols = matrix[0].length;
+        const result = Array(cols).fill(0);
+        for (let row of matrix) {
+            for (let i = 0; i < cols; i++) {
+                result[i] += row[i];
+            }
+        }
+        return result;
+    } else if (dim === 1) {
+        // Sum along rows
+        return matrix.map((row) => row.reduce((sum, val) => sum + val, 0));
+    } else {
+        throw new Error("dim must be 0 or 1");
+    }
+}
+
+function matrixAdd(A, B) {
+    const rows = A.length;
+    const cols = A[0].length;
+
+    if (A.length !== B.length || A[0].length !== B[0].length) {
+        throw new Error("Matrix dimensions do not align for addition.");
+    }
+    let result = [...Array(rows)].map((e) => Array(cols));
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            result[i][j] = A[i][j] + B[i][j];
+        }
+    }
+    return result;
+}
+
 function softmax(matrix, dim = 1) {
     const exp = (x) => Math.exp(x);
 
@@ -111,16 +170,13 @@ function weightedLogicOutput(table_output, table_probs) {
     const height = table_output[0].length;
     const width = table_output[0][0].length;
 
-    const output = Array.from({ length: height }, () =>
-        Array(width).fill(0)
-    );
-    
+    const output = Array.from({ length: height }, () => Array(width).fill(0));
+
     for (let i = 0; i < 16; i++) {
         const prob = table_probs[i];
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 output[y][x] += table_output[i][y][x] * prob[y];
-               
             }
         }
     }
@@ -129,5 +185,5 @@ function weightedLogicOutput(table_output, table_probs) {
 }
 
 function transpose(matrix) {
-    return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
+    return matrix[0].map((_, colIndex) => matrix.map((row) => row[colIndex]));
 }
