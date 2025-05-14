@@ -12,8 +12,19 @@ class NueralNetwork {
     }
     show() {
         for (let i = 0; i < this.layers.length; i++) {
+            this.layers[i].update();
             this.layers[i].show();
             this.layers[i].showGUI();
+        }
+    }
+    mousePressed(x, y) {
+        for (let i = 0; i < this.layers.length; i++) {
+            this.layers[i].mousePressed(x, y);
+        }
+    }
+    mouseReleased() {
+        for (let i = 0; i < this.layers.length; i++) {
+            this.layers[i].mouseReleased();
         }
     }
 }

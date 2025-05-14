@@ -51,6 +51,44 @@ function seededRandom(seed) {
 
 const rng = seededRandom(12345); // Seed value
 
+function argmax(matrix, dim) {
+    if (dim === 0) {
+        const cols = matrix[0].length;
+        const result = Array(cols).fill(0);
+        for (let j = 0; j < cols; j++) {
+            let maxVal = matrix[0][j];
+            let maxIdx = 0;
+            for (let i = 1; i < matrix.length; i++) {
+                if (matrix[i][j] > maxVal) {
+                    maxVal = matrix[i][j];
+                    maxIdx = i;
+                }
+            }
+            result[j] = maxIdx;
+        }
+        return result;
+    } else if (dim === 1) {
+        return matrix.map(row => {
+            let maxVal = row[0];
+            let maxIdx = 0;
+            for (let i = 1; i < row.length; i++) {
+                if (row[i] > maxVal) {
+                    maxVal = row[i];
+                    maxIdx = i;
+                }
+            }
+            return maxIdx;
+        });
+    } else {
+        throw new Error("dim must be 0 or 1");
+    }
+}
+
+function where(arr, conditionFn, valIfTrue, valIfFalse) {
+    return arr.map(val => conditionFn(val) ? valIfTrue : valIfFalse);
+}
+
+
 function arrayClamp(arr, minVal, maxVal) {
     return arr.map((val) => Math.max(minVal, Math.min(maxVal, val)));
 }
@@ -71,6 +109,20 @@ function arrayMatrixAddition(matrix, arr) {
     for (let i = 0; i < rows; i++) {
         for (let j = 0; j < cols; j++) {
             result[i][j] = matrix[i][j] + arr[j]
+        }
+    }
+    return result;
+}
+
+
+function arrayMatrixMutliplication(matrix, arr) {
+    const rows = matrix.length;
+    const cols = matrix[0].length;
+
+    let result = [...Array(rows)].map((e) => Array(cols));
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            result[i][j] = matrix[i][j] * arr[i]
         }
     }
     return result;

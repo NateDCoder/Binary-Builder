@@ -23,12 +23,12 @@ function setup() {
         new LogicLayer(4, 5, INPUT_A_PROBS_0, INPUT_B_PROBS_0, TABLE_PROBS_0, 0),
         new LogicLayer(5, 5, INPUT_A_PROBS_1, INPUT_B_PROBS_1, TABLE_PROBS_1, 1),
         new LogicLayer(5, 5, INPUT_A_PROBS_2, INPUT_B_PROBS_2, TABLE_PROBS_2, 2),
-        new LogicLayer(5, 4, INPUT_A_PROBS_3, INPUT_B_PROBS_3, TABLE_PROBS_3, 3),
+        new LogicLayer(5, 4, INPUT_A_PROBS_3, INPUT_B_PROBS_3, TABLE_PROBS_3, 3)
     ]);
-    let sliced = transpose(binaryInputs)
-        .slice(4, 8)
-        .map((row) => row.slice(0, 15));
-    console.log(transpose(nn.forward(sliced)));
+    // let sliced = transpose(binaryInputs)
+    //     .slice(4, 8)
+    //     .map((row) => row.slice(0, 15));
+    console.log(transpose(nn.forward(transpose(binaryInputs))));
 }
 
 function draw() {
@@ -76,6 +76,7 @@ function draw() {
 }
 
 function mousePressed() {
+    nn.mousePressed(mouseX, mouseY);
     let intersect = false;
     for (let i = 0; i < logicGates.length; i++) {
         if (logicGates[i].intersect(mouseX, mouseY)) {
@@ -113,6 +114,7 @@ function turnOffDraggable() {
 function mouseReleased() {
     turnOffDraggable();
     handleContextWindow();
+    nn.mouseReleased();
     if (!sampleLine) return;
 
     for (let logicGate of logicGates) {

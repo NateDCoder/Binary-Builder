@@ -7,7 +7,7 @@ class LogicLayer {
         this.input_A_probs = softmax(input_A_probs, 1);
         this.input_B_probs = softmax(input_B_probs, 1);
         this.table_probs = softmax(table_probs, 0);
-
+        
         let multiplier = subtract1FromArray(
             divArray(
                 1,
@@ -15,8 +15,20 @@ class LogicLayer {
             )
         );
         console.log(input_A_probs.length, input_A_probs[0].length, multiplier.length);
-        this.input_A_probs = softmax(arrayMatrixAddition(input_A_probs, multiplier), 1);
-        this.input_B_probs = softmax(arrayMatrixAddition(input_B_probs, multiplier), 1);
+
+        const indexs = argmax(table_probs, 0);
+
+        const a_Zeroes = where(indexs, (val) => val === 5 || val === 10, 0, 1);
+        const b_Zeroes = where(indexs, (val) => val === 3 || val === 12, 0, 1);
+
+        this.input_A_probs = softmax(
+            arrayMatrixAddition(arrayMatrixMutliplication(input_A_probs, a_Zeroes), multiplier),
+            1
+        );
+        this.input_B_probs = softmax(
+            arrayMatrixAddition(arrayMatrixMutliplication(input_B_probs, b_Zeroes), multiplier),
+            1
+        );
 
         this.positions = [];
         this.startPositions = [];
@@ -24,15 +36,15 @@ class LogicLayer {
         for (let i = 0; i < this.input_A_probs[0].length; i++) {
             if (index == 0) {
                 this.startPositions.push(
-                    createVector(number1.position.x + 30 / 2, number1.position.y + (i + 4) * 30)
+                    createVector(number1.position.x + 30 / 2, number1.position.y + i * 30)
                 );
-            } else {
-                this.startPositions.push(createVector(150 + (index - 1) * 100, (i + 2) * 50));
             }
         }
         for (let i = 0; i < this.input_A_probs.length; i++) {
-            this.positions.push(createVector(150 + index * 100, (i + 2) * 50));
+            this.positions.push(createVector(100 + index * 50, (i + 2 ) * 40));
         }
+
+        this.selectedI = null;
     }
 
     forward(prev_layer_output) {
@@ -47,14 +59,10 @@ class LogicLayer {
     }
 
     show() {
-        console.log(
-            this.input_A_probs[0].length,
-            this.input_A_probs.length,
-            this.startPositions.length,
-            this.positions.length
-        );
         for (let i = 0; i < this.input_A_probs[0].length; i++) {
             for (let j = 0; j < this.input_A_probs.length; j++) {
+                console.log(nn)
+                let startPositions = this.index==0 ? this.startPositions[i] : nn.layers[this.index-1].positions[i]
                 if (!(this.table_probs[5][j] > 0.8)) {
                     stroke(
                         lerpColor(
@@ -64,8 +72,8 @@ class LogicLayer {
                         )
                     );
                     line(
-                        this.startPositions[i].x,
-                        this.startPositions[i].y,
+                        startPositions.x,
+                        startPositions.y,
                         this.positions[j].x - 5,
                         this.positions[j].y - 5
                     );
@@ -80,8 +88,8 @@ class LogicLayer {
                         )
                     );
                     line(
-                        this.startPositions[i].x,
-                        this.startPositions[i].y,
+                        startPositions.x,
+                        startPositions.y,
                         this.positions[j].x - 5,
                         this.positions[j].y + 5
                     );
@@ -128,5 +136,20 @@ class LogicLayer {
                 text(maxIndex, this.positions[i].x + 25, this.positions[i].y + 35);
             }
         }
+    }
+    update() {
+        if (this.selectedI !==null) {
+            this.positions[this.selectedI] = createVector(mouseX, mouseY)
+        }
+    }
+    mousePressed(x, y) {
+        for (let i = 0; i < this.positions.length; i++) {
+            if (dist(x, y, this.positions[i].x, this.positions[i].y) < 15) {
+                this.selectedI = i;
+            }
+        }
+    }
+    mouseReleased() {
+        this.selectedI = null;
     }
 }

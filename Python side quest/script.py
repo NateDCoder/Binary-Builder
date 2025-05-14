@@ -4,13 +4,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator
 
 import math
+
+import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-seed = 31
+seed = 314 #0.048120
 torch.manual_seed(seed)
 
 # If using CUDA
@@ -93,7 +97,7 @@ def dec2Bin(dec):
     while (dec > 0):
         bin = str(dec % 2) + bin
         dec //= 2
-    bin = (4 - len(bin)) * "0" + bin
+    bin = (8 - len(bin)) * "0" + bin
     return bin
 
 class GradFactor(torch.autograd.Function):
@@ -104,7 +108,7 @@ class GradFactor(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_y):
-        return grad_y * ctx.f, None
+        return grad_y / torch.abs(torch.max(grad_y)), None
     
 def apply_weight_dropout(weights, dropout_rate):
     if dropout_rate == 0:
@@ -120,50 +124,55 @@ class LogicLayer(nn.Module):
         self.size = size
         self.prev_size = prev_size
 
-        self.input_A_weights = nn.Parameter(torch.empty(size, prev_size))
-        nn.init.kaiming_uniform_(self.input_A_weights, a=math.sqrt(5))
-
-        self.input_B_weights = nn.Parameter(torch.empty(size, prev_size))
-        nn.init.kaiming_uniform_(self.input_B_weights, a=math.sqrt(5))
-        
-        self.table_weights = nn.Parameter(torch.empty(16, size))  # 16 logic ops per neuron
-        nn.init.kaiming_uniform_(self.table_weights, a=math.sqrt(5))
-    def forward(self, prev_layer_output):
-        if not torch.is_grad_enabled():
-            a_indices = torch.argmax(self.input_A_weights, dim=1)
-            b_indices = torch.argmax(self.input_B_weights, dim=1)
-            
-            table_indices = torch.argmax(self.table_weights, dim=0)
+        self.input_A_weights = nn.Parameter(torch.randn(size, prev_size)) 
+        self.input_B_weights = nn.Parameter(torch.randn(size, prev_size))
   
-            input_A_probs = torch.nn.functional.one_hot(a_indices, num_classes=self.input_A_weights.size(1)).float()
-            input_B_probs = torch.nn.functional.one_hot(b_indices, num_classes=self.input_B_weights.size(1)).float()
-            table_probs = torch.nn.functional.one_hot(table_indices, num_classes=self.table_weights.size(0)).float().T
+        
+        self.table_weights = nn.Parameter(torch.randn(16, size))  # 16 logic ops per neuron
+        
+    def forward(self, prev_layer_output):
+        # if not torch.is_grad_enabled():
+        #     a_indices = torch.argmax(self.input_A_weights, dim=1)
+        #     b_indices = torch.argmax(self.input_B_weights, dim=1)
             
-            a_inputs = torch.matmul(input_A_probs, prev_layer_output)
-            b_inputs = torch.matmul(input_B_probs, prev_layer_output)
+        #     table_indices = torch.argmax(self.table_weights, dim=0)
+  
+        #     input_A_probs = torch.nn.functional.one_hot(a_indices, num_classes=self.input_A_weights.size(1)).float()
+        #     input_B_probs = torch.nn.functional.one_hot(b_indices, num_classes=self.input_B_weights.size(1)).float()
+        #     table_probs = torch.nn.functional.one_hot(table_indices, num_classes=self.table_weights.size(0)).float().T
             
-            table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
-            output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
+        #     a_inputs = torch.matmul(input_A_probs, prev_layer_output)
+        #     b_inputs = torch.matmul(input_B_probs, prev_layer_output)
             
-            return output
+        #     table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
+        #     output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
             
-        prev_layer_output = GradFactor.apply(prev_layer_output, 2)
+        #     return output
+            
+        prev_layer_output = GradFactor.apply(prev_layer_output, 4)
+        input_A_weights = -1 + F.softplus(self.input_A_weights)
+        input_B_weights = -1 + F.softplus(self.input_B_weights)
+        
         # Softmax for differentiable input selectors
-        input_A_probs = F.softmax(self.input_A_weights, dim=1)
-        input_B_probs = F.softmax(self.input_B_weights, dim=1)
+        input_A_probs = F.softmax(input_A_weights, dim=1)
+        input_B_probs = F.softmax(input_B_weights, dim=1)
         table_probs = F.softmax(self.table_weights, dim=0)
         
-        multiplier = 1 / torch.clamp(torch.sum(input_A_probs + input_B_probs, dim=0), 0, 1) - 1
+        # indexs = torch.argmax(self.table_weights, dim=0)
+  
+        a_Zeroes = (1 - (table_probs[5] + table_probs[10])).unsqueeze(-1)
+        b_Zeroes = (1 - (table_probs[3] + table_probs[12])).unsqueeze(-1)
         
-        
-        input_A_probs = F.softmax(self.input_A_weights + multiplier.unsqueeze(0), dim=1)
-        input_B_probs = F.softmax(self.input_B_weights + multiplier.unsqueeze(0), dim=1)
+        multiplier = 1 / torch.clamp(torch.sum(input_A_probs * a_Zeroes + input_B_probs * b_Zeroes, dim=0), 0, 1) - 1
+
+        input_A_probs = F.softmax(input_A_weights + multiplier.unsqueeze(0), dim=1)
+        input_B_probs = F.softmax(input_B_weights + multiplier.unsqueeze(0), dim=1)
    
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 2)
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 2)
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 4)
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 4)
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
-        output = torch.sum(table_output * table_probs.unsqueeze(-1), dim=0)  # shape: [batch_size, size]
+        output = GradFactor.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0), 4)  # shape: [batch_size, size]
 
         return output
 class BinaryToDecimalMSELoss(nn.Module):
@@ -186,9 +195,9 @@ class BinaryToDecimalMSELoss(nn.Module):
 batch_inputs = []
 batch_targets = []
 # for _ in range(100):
-for i in range(15):
+for i in range(255):
     bin_input = list(dec2Bin(i))
-    bin_target = list(dec2Bin((i + 1) % 256)) 
+    bin_target = list(dec2Bin((i) % 256)) 
 
     batch_inputs.append([float(x) for x in bin_input])
     batch_targets.append([float(x) for x in bin_target])
@@ -205,10 +214,10 @@ batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device)
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
 
 model = torch.nn.Sequential(
-    LogicLayer(4, 6),
-    LogicLayer(6, 6),
-    LogicLayer(6, 6),
-    LogicLayer(6, 4)
+    LogicLayer(8, 8),
+    LogicLayer(8, 8),
+    LogicLayer(8, 8),
+    LogicLayer(8, 8)
 ).to(device)
 
 
@@ -305,28 +314,29 @@ for epoch in range(epochs):
     print(f"Epoch {epoch+1}: Last Batch Loss = {loss.item():.6f}")
 
 # print(output_grads)
-batch_inputs = []
-batch_targets = []
+# batch_inputs = []
+# batch_targets = []
    
-for i in range(15):
-    bin_input = list(dec2Bin(i))
-    bin_target = list(dec2Bin((i+1) % 256)) 
+# for i in range(15):
+#     bin_input = list(dec2Bin(i))
+#     bin_target = list(dec2Bin((i+1) % 256)) 
 
-    batch_inputs.append([float(x) for x in bin_input])
-    batch_targets.append([float(x) for x in bin_target])
-batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
-batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
-model.training = False
+#     batch_inputs.append([float(x) for x in bin_input])
+#     batch_targets.append([float(x) for x in bin_target])
+# batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
+# batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
+# model.training = False
 
 # Final output
 with torch.no_grad():
     output = model(batch_inputs.T)
     final_loss = criterion(output, batch_targets.T).item()
+torch.set_printoptions(precision=2, sci_mode=False)
 output = model(batch_inputs.T)
+
 print(f"\nFinal Loss: {final_loss:.6f}")
 print(batch_targets[:5])
 print("Sample Output:\n", output.T)
-
 
 # name, param = list(model.named_parameters())[0]
 # print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
@@ -334,9 +344,16 @@ print("Sample Output:\n", output.T)
 # print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
 # name, param = list(model.named_parameters())[2]
 # print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=0)}")
-torch.set_printoptions(precision=2, sci_mode=False)
+
+original = []
+direction1 = []
+direction2 = []
+
 i = 0
 for name, param in model.named_parameters():
+    original.append(param.data)
+    direction1.append(torch.rand_like(param.data) * 5)
+    direction2.append(torch.rand_like(param.data) * 5)
     if "input_A_weights" in name:
         print(f"const INPUT_A_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist()}")
     elif "input_B_weights" in name:
@@ -344,6 +361,43 @@ for name, param in model.named_parameters():
     elif "table" in name:
         print(f"const TABLE_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist() }")
     i += 1
+
+X = np.arange(-2, 2, 0.1)
+Y = np.arange(-2, 2, 0.1)
+X, Y = np.meshgrid(X, Y)
+Z = np.zeros_like(X)
+
+for i in range(X.shape[0]):
+    for j in range(X.shape[1]):
+        x = X[i, j]
+        y = Y[i, j]
+        
+        # Modify model parameters
+        with torch.no_grad():
+            for k, (name, param) in enumerate(model.named_parameters()):
+                param.data = (original[k] + x * direction1[k] + y * direction2[k])
+        
+        # Compute loss
+        output = model(batch_inputs.T)
+        loss = criterion(output, batch_targets.T)
+        Z[i, j] = loss.item()
+        if math.isnan(loss.item()):
+            quit()
+fig2, ax2 = plt.subplots(subplot_kw={"projection": "3d"})
+
+# Plot the surface.
+surf = ax2.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+
+# Customize the z axis.
+ax2.set_zlim(np.min(Z), np.max(Z))
+ax2.zaxis.set_major_locator(LinearLocator(10))
+# A StrMethodFormatter is used automatically
+ax2.zaxis.set_major_formatter('{x:.02f}')
+
+# Add a color bar which maps values to colors.
+fig2.colorbar(surf, shrink=0.5, aspect=5)
+
 x_values = range(len(error_over_time))
 
 fig, ax = plt.subplots()
