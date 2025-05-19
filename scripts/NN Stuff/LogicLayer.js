@@ -3,30 +3,34 @@ class LogicLayer {
         this.index = index;
         this.size = size;
         this.prev_size = prev_size;
+        input_A_probs = input_A_probs
+        input_B_probs = input_B_probs
 
         this.input_A_probs = softmax(input_A_probs, 1);
         this.input_B_probs = softmax(input_B_probs, 1);
         this.table_probs = softmax(table_probs, 0);
-        
+
+
+        const a_Zeroes = oneSubtractFromArray(addArrays(this.table_probs[0], this.table_probs[5], this.table_probs[10], this.table_probs[15]));
+
+        const b_Zeroes = oneSubtractFromArray(addArrays(this.table_probs[0], this.table_probs[3], this.table_probs[12], this.table_probs[15]));
         let multiplier = subtract1FromArray(
             divArray(
                 1,
-                arrayClamp(matrixSum(matrixAdd(this.input_A_probs, this.input_B_probs), 0), 0, 1)
+                arrayClamp(matrixSum(matrixAdd(
+                    arrayMatrixMutliplication(this.input_A_probs, a_Zeroes), 
+                    arrayMatrixMutliplication(this.input_B_probs, b_Zeroes)), 0), 0, 1)
             )
         );
-        console.log(input_A_probs.length, input_A_probs[0].length, multiplier.length);
-
-        const indexs = argmax(table_probs, 0);
-
-        const a_Zeroes = where(indexs, (val) => val === 5 || val === 10, 0, 1);
-        const b_Zeroes = where(indexs, (val) => val === 3 || val === 12, 0, 1);
-
+        console.log(multiplier)
+        console.log("A Zeroes", a_Zeroes);
+        console.log(this.table_probs)
         this.input_A_probs = softmax(
-            arrayMatrixAddition(arrayMatrixMutliplication(input_A_probs, a_Zeroes), multiplier),
+            arrayMatrixAddition(input_A_probs, multiplier),
             1
         );
         this.input_B_probs = softmax(
-            arrayMatrixAddition(arrayMatrixMutliplication(input_B_probs, b_Zeroes), multiplier),
+            arrayMatrixAddition(input_B_probs, multiplier),
             1
         );
 
@@ -41,7 +45,7 @@ class LogicLayer {
             }
         }
         for (let i = 0; i < this.input_A_probs.length; i++) {
-            this.positions.push(createVector(100 + index * 50, (i + 2 ) * 40));
+            this.positions.push(createVector(100 + index * 50, (i + 2) * 40));
         }
 
         this.selectedI = null;
@@ -61,9 +65,11 @@ class LogicLayer {
     show() {
         for (let i = 0; i < this.input_A_probs[0].length; i++) {
             for (let j = 0; j < this.input_A_probs.length; j++) {
-                console.log(nn)
-                let startPositions = this.index==0 ? this.startPositions[i] : nn.layers[this.index-1].positions[i]
-                if (!(this.table_probs[5][j] > 0.8)) {
+                let startPositions =
+                    this.index == 0
+                        ? this.startPositions[i]
+                        : nn.layers[this.index - 1].positions[i];
+                if (!(this.table_probs[5][j] > 0.8) && !(this.table_probs[10][j] > 0.8)) {
                     stroke(
                         lerpColor(
                             color(100, this.input_A_probs[j][i] * 255),
@@ -79,7 +85,7 @@ class LogicLayer {
                     );
                 }
                 // B Line
-                if (!(this.table_probs[3][j] > 0.8)) {
+                if (!(this.table_probs[3][j] > 0.8) && !(this.table_probs[12][j] > 0.8)) {
                     stroke(
                         lerpColor(
                             color(100, this.input_B_probs[j][i] * 255),
@@ -133,13 +139,17 @@ class LogicLayer {
                     0
                 );
 
-                text(maxIndex, this.positions[i].x + 25, this.positions[i].y + 35);
+                text(
+                    maxIndex + " " + int(this.table_probs[maxIndex][i] * 100),
+                    this.positions[i].x + 25,
+                    this.positions[i].y + 35
+                );
             }
         }
     }
     update() {
-        if (this.selectedI !==null) {
-            this.positions[this.selectedI] = createVector(mouseX, mouseY)
+        if (this.selectedI !== null) {
+            this.positions[this.selectedI] = createVector(mouseX, mouseY);
         }
     }
     mousePressed(x, y) {

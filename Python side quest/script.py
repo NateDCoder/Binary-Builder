@@ -29,22 +29,26 @@ torch.backends.cudnn.benchmark = False
 
 def tableOperator(A:torch.Tensor, B:torch.Tensor) -> torch.Tensor: 
     result = torch.empty((16,) + A.shape, device=A.device)
+    AB = A * B
+    A_or_B = A + B - AB
+    A_xor_B = A + B - 2 * AB
+    
     # Perform the logical operations
     result[0]  = 0                                         # 0:False
-    result[1]  = A * B                                     # 1:A ∧ B
-    result[2]  = A - A * B                                 # 2:¬(A ⇒ B)
+    result[1]  = AB                                        # 1:A ∧ B
+    result[2]  = A - AB                                    # 2:¬(A ⇒ B)
     result[3]  = A                                         # 3:A
-    result[4]  = B - A * B                                 # 4:¬(A ⇐ B)
+    result[4]  = B - AB                                    # 4:¬(A ⇐ B)
     result[5]  = B                                         # 5:B
-    result[6]  = A + B - 2 * A * B                         # 6:A ⊕ B
-    result[7]  = A + B - A * B                             # 7:A ∨ B
-    result[8]  = 1 - (A + B - A * B)                       # 8:¬(A ∨ B)
-    result[9]  = 1 - (A + B - 2 * A * B)                   # 9:¬(A ⊕ B)
+    result[6]  = A_xor_B                                   # 6:A ⊕ B
+    result[7]  = A_or_B                                    # 7:A ∨ B
+    result[8]  = 1 - A_or_B                                # 8:¬(A ∨ B)
+    result[9]  = 1 - A_xor_B                               # 9:¬(A ⊕ B)
     result[10] = 1 - B                                     # 10:¬B
-    result[11] = 1 - B + A * B                             # 11:A ⇐ B
+    result[11] = 1 - B + AB                                # 11:A ⇐ B
     result[12] = 1 - A                                     # 12:¬A
-    result[13] = 1 - A + A * B                             # 13:A ⇒ B
-    result[14] = 1 - A * B                                 # 14:¬(A ∧ B)
+    result[13] = 1 - A + AB                                # 13:A ⇒ B
+    result[14] = 1 - AB                                    # 14:¬(A ∧ B)
     result[15] = 1                                         # 15:True
     return result
 
@@ -108,29 +112,48 @@ class GradFactor(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_y):
-        return grad_y / torch.abs(torch.max(grad_y)), None
+        new_grad = grad_y / grad_y.norm() + 1e-8
+        return new_grad, None
     
-def apply_weight_dropout(weights, dropout_rate):
+def apply_probs_dropout(probs, dropout_rate):
     if dropout_rate == 0:
-        return weights
-    
-    mask = (torch.rand_like(weights) > dropout_rate)
-    dropped_weights = weights.masked_fill(mask == 0, float('-inf'))
-    return dropped_weights
+        return probs
+
+    num_outputs = probs.size(1)  # number of neurons (columns)
+    device = probs.device
+
+    # Sample dropout mask: True → use one-hot, False → use soft probs
+    dropout_mask = torch.rand(num_outputs, device=device) < dropout_rate  # [8]
+
+    # Sample indices from categorical distributions for all neurons
+    dist = torch.distributions.Categorical(probs.T)
+    sampled_indices = dist.sample()  # shape: [8]
+
+    # Create one-hot vectors
+    one_hot = F.one_hot(sampled_indices, num_classes=probs.size(0)).float().T  # shape: [16, 8]
+
+    # Broadcast mask and combine
+    dropout_mask = dropout_mask.unsqueeze(0).float()  # shape: [1, 8]
+    final_probs = dropout_mask * one_hot + (1 - dropout_mask) * probs  # shape: [16, 8]
+
+    return final_probs
+
 torch.set_printoptions(precision=6, sci_mode=False)
+drop_out_rate = 0.0
 class LogicLayer(nn.Module):
     def __init__(self, prev_size, size):
         super().__init__()
         self.size = size
         self.prev_size = prev_size
 
-        self.input_A_weights = nn.Parameter(torch.randn(size, prev_size)) 
-        self.input_B_weights = nn.Parameter(torch.randn(size, prev_size))
+        self.input_A_weights = nn.Parameter(torch.rand(size, prev_size)) 
+        self.input_B_weights = nn.Parameter(torch.rand(size, prev_size))
   
         
-        self.table_weights = nn.Parameter(torch.randn(16, size))  # 16 logic ops per neuron
+        self.table_weights = nn.Parameter(torch.rand(16, size))  # 16 logic ops per neuron
         
     def forward(self, prev_layer_output):
+        global drop_out_rate
         # if not torch.is_grad_enabled():
         #     a_indices = torch.argmax(self.input_A_weights, dim=1)
         #     b_indices = torch.argmax(self.input_B_weights, dim=1)
@@ -149,30 +172,42 @@ class LogicLayer(nn.Module):
             
         #     return output
             
-        prev_layer_output = GradFactor.apply(prev_layer_output, 4)
-        input_A_weights = -1 + F.softplus(self.input_A_weights)
-        input_B_weights = -1 + F.softplus(self.input_B_weights)
+        prev_layer_output = GradFactor.apply(prev_layer_output, 2.5)
+        input_A_weights = torch.clamp(self.input_A_weights, -1, 5)
+        input_B_weights = torch.clamp(self.input_B_weights, -1, 5)
         
         # Softmax for differentiable input selectors
         input_A_probs = F.softmax(input_A_weights, dim=1)
         input_B_probs = F.softmax(input_B_weights, dim=1)
-        table_probs = F.softmax(self.table_weights, dim=0)
+        table_probs = apply_probs_dropout(F.softmax(self.table_weights, dim=0), drop_out_rate)
         
         # indexs = torch.argmax(self.table_weights, dim=0)
-  
-        a_Zeroes = (1 - (table_probs[5] + table_probs[10])).unsqueeze(-1)
-        b_Zeroes = (1 - (table_probs[3] + table_probs[12])).unsqueeze(-1)
         
-        multiplier = 1 / torch.clamp(torch.sum(input_A_probs * a_Zeroes + input_B_probs * b_Zeroes, dim=0), 0, 1) - 1
-
+        a_Zeroes = (1 - (table_probs[0] + table_probs[5] + table_probs[10] + table_probs[15])).unsqueeze(-1)
+        b_Zeroes = (1 - (table_probs[0] + table_probs[3] + table_probs[12] + table_probs[15])).unsqueeze(-1)
+        
+        filter_values = input_A_probs * a_Zeroes + input_B_probs * b_Zeroes
+        summed = torch.sum(filter_values, dim=0)
+        clamped = torch.clamp(summed, 1e-8, 1)
+        multiplier = 1 / clamped - 1
+        self.multiplier = multiplier
+        
         input_A_probs = F.softmax(input_A_weights + multiplier.unsqueeze(0), dim=1)
         input_B_probs = F.softmax(input_B_weights + multiplier.unsqueeze(0), dim=1)
-   
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 4)
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 4)
+        
+        # if not torch.is_grad_enabled():
+        #     print("old multiplier", multiplier)
+        #     a_Zeroes = (1 - (table_probs[0] + table_probs[5] + table_probs[10] + table_probs[15])).unsqueeze(-1)
+        #     b_Zeroes = (1 - (table_probs[0] + table_probs[3] + table_probs[12] + table_probs[15])).unsqueeze(-1)
+        
+        #     multiplier = 1 / torch.clamp(torch.sum(input_A_probs * a_Zeroes + input_B_probs * b_Zeroes, dim=0), 0, 1) - 1
+        #     print("new multiplier", multiplier)
+        
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 2.5)
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 2.5)
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
-        output = GradFactor.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0), 4)  # shape: [batch_size, size]
+        output = GradFactor.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0), 2.5)  # shape: [batch_size, size]
 
         return output
 class BinaryToDecimalMSELoss(nn.Module):
@@ -242,10 +277,10 @@ criterion = BinaryToDecimalMSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 20000
+epochs = 5000
 
 
-batch_size = len(batch_inputs) // 1  # for 5 batches
+batch_size = len(batch_inputs) // 5  # for 5 batches
 
 output_grads = []
 
@@ -255,6 +290,10 @@ for i in range(8):
     
 for epoch in range(epochs):
     epoch += 1
+    # if epoch % 1000 < 500 and epoch > 2000:
+    #     drop_out_rate = 0.15
+    # else:
+    #     drop_out_rate = 0
     # Shuffle indices     
     indices = torch.randperm(len(batch_inputs))
     inputs_shuffled = batch_inputs[indices]
@@ -291,12 +330,17 @@ for epoch in range(epochs):
         batch_losses.append((i, loss.item()))
         
         try:
-            _, param = list(model.named_parameters())[1]
-            param = F.softmax(param.data, dim=1)
-            for i in range(len(param[0])):
-                tableOperatorOverTime[i].append(float(param[3][i]))
+            # _, param1 = list(model.named_parameters())[0]
+            # _, param2 = list(model.named_parameters())[1]
+            # param1 = F.softmax(param1.data, dim=1)
+            # param2 = F.softmax(param2.data, dim=1)
+            # for i in range(len(param1)):
+            #     tableOperatorOverTime[i].append(float(param1[i][4]) + float(param2[i][4]))
+            for i in range(len(model[0].multiplier)):
+                tableOperatorOverTime[i].append(float(model[0].multiplier[i]))
         except:
-           for i in range(8):
+            print("Crashing out")
+            for i in range(8):
                 tableOperatorOverTime[i].append(0) 
     # top_n = 1
     # worst_batches_input = batch_inputs[-5:]

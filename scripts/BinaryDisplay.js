@@ -47,6 +47,7 @@ class BinaryDisplay {
           this.handleRightClick(i);
         } else {
           this.toggleBit(i);
+          currentIndex = bin2Dec(this.binary)
         }
         return true;
       }

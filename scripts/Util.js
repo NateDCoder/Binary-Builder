@@ -100,6 +100,18 @@ function divArray(number, array) {
 function subtract1FromArray(arr) {
     return arr.map(val => val - 1);
 }
+function oneSubtractFromArray(arr) {
+    return arr.map(val => 1 - val);
+}
+
+function clamp2DArray(array, min, max) {
+  return array.map(row =>
+    row.map(value =>
+      Math.max(min, Math.min(max, value))
+    )
+  );
+}
+
 
 function arrayMatrixAddition(matrix, arr) {
     const rows = matrix.length;
@@ -127,6 +139,32 @@ function arrayMatrixMutliplication(matrix, arr) {
     }
     return result;
 }
+
+function addArrays(...arrays) {
+  if (arrays.length === 0) return [];
+  
+  const length = arrays[0].length;
+
+  // Check that all arrays are the same length
+  for (const arr of arrays) {
+    if (arr.length !== length) {
+      throw new Error("All arrays must be the same length");
+    }
+  }
+
+  // Initialize result with zeros
+  const result = new Array(length).fill(0);
+
+  // Sum all arrays element-wise
+  for (const arr of arrays) {
+    for (let i = 0; i < length; i++) {
+      result[i] += arr[i];
+    }
+  }
+
+  return result;
+}
+
 function matrixSum(matrix, dim) {
     if (dim === 0) {
         // Sum along columns
