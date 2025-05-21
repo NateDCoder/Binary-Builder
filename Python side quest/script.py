@@ -106,13 +106,15 @@ def dec2Bin(dec):
 
 class GradFactor(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, f):
+    def forward(ctx, x, f = False):
         ctx.f = f
         return x
 
     @staticmethod
     def backward(ctx, grad_y):
         new_grad = grad_y / grad_y.norm() + 1e-8
+        if ctx.f:
+            print(new_grad)
         return new_grad, None
     
 def apply_probs_dropout(probs, dropout_rate):
@@ -196,7 +198,7 @@ class LogicLayer(nn.Module):
             
         #     return output
             
-        prev_layer_output = GradFactor.apply(prev_layer_output, 2.5)
+        prev_layer_output = GradFactor.apply(prev_layer_output)
         input_A_weights = self.input_A_weights
         input_B_weights = self.input_B_weights
         
@@ -213,10 +215,26 @@ class LogicLayer(nn.Module):
             a_Zeroes = (1 - (table_probs[0] + table_probs[5] + table_probs[10] + table_probs[15])).unsqueeze(-1)
             b_Zeroes = (1 - (table_probs[0] + table_probs[3] + table_probs[12] + table_probs[15])).unsqueeze(-1)
 
+            # print(a_Zeroes)
             filter_values = input_A_probs * a_Zeroes + input_B_probs * b_Zeroes
             summed = torch.sum(filter_values, dim=0)
             clamped = torch.clamp(summed, 1e-8, 1)
             multiplier = 1 / clamped - 1
+            
+            
+            a_Correlation = (table_probs[3] + table_probs[12]).unsqueeze(-1) + 1
+            b_Correlation = (table_probs[5] + table_probs[10]).unsqueeze(-1) + 1
+    
+            influence_matrix = input_A_probs * a_Zeroes * a_Correlation + input_B_probs * b_Zeroes * b_Correlation - 1
+            
+            correction_matrix = torch.sum(torch.maximum(influence_matrix, torch.tensor(0)), dim=0)
+            mask = ((influence_matrix > 0).sum(dim=0) >= 2).int() # Shape: [num_rows, num_cols]
+
+            problem_spots = correction_matrix * mask  # Shape: [num_cols]
+            # print("problem spots", problem_spots)
+            # print(problem_spots)
+            multiplier -= problem_spots
+            
             return multiplier
 
   
@@ -227,47 +245,21 @@ class LogicLayer(nn.Module):
         if torch.is_grad_enabled():
             multiplier = forward_multiplier(input_A_weights, input_B_weights, self.table_weights)
             
-            # grads = torch.autograd.grad(
-            #     outputs=multiplier.sum(),
-            #     inputs=[input_A_weights, input_B_weights],
-            #     create_graph=True  # keep graph for higher-order grads
-            # )
-            
             self.multiplier = multiplier
-   
+                
             input_A_probs = apply_connection_dropout(F.softmax(input_A_weights + multiplier, dim=1), 0)
             input_B_probs = apply_connection_dropout(F.softmax(input_B_weights + multiplier, dim=1), 0)
+            
+        
          
-        # if not torch.is_grad_enabled():
-        #     print("old multiplier", multiplier)
-        #     a_Zeroes = (1 - (table_probs[0] + table_probs[5] + table_probs[10] + table_probs[15])).unsqueeze(-1)
-        #     b_Zeroes = (1 - (table_probs[0] + table_probs[3] + table_probs[12] + table_probs[15])).unsqueeze(-1)
         
-        #     multiplier = 1 / torch.clamp(torch.sum(input_A_probs * a_Zeroes + input_B_probs * b_Zeroes, dim=0), 0, 1) - 1
-        #     print("new multiplier", multiplier)
-        
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output), 2.5)
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output), 2.5)
+        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output))
+        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output))
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
-        output = GradFactor.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0), 2.5)  # shape: [batch_size, size]
+        output = GradFactor.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0))  # shape: [batch_size, size]
 
         return output
-class BinaryToDecimalMSELoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-        # Make the weights once: [2^7, 2^6, ..., 2^0]
-        self.register_buffer("weights", 1.3 ** torch.arange(7, -1, -1).float().to(device).unsqueeze(-1))
-
-    def forward(self, output, target):
-        # output, target shape: [batch_size, 8]
-        # Compute decimal values
-        # print(output.shape, target.shape, self.weights.shape)
-        # print(output.T[0], target.T[0], self.weights)
-        error_rate = 1
-        output_decimal = (output * error_rate)
-        target_decimal = (target * error_rate)
-        return F.mse_loss(output_decimal, target_decimal)
     
 # Create batch for 0 through 7
 batch_inputs = []
@@ -279,44 +271,23 @@ for i in range(255):
 
     batch_inputs.append([float(x) for x in bin_input])
     batch_targets.append([float(x) for x in bin_target])
-# for i in range(5):
-#     i+=2
-#     bin_input = list(dec2Bin(2**i - 1))
-#     bin_target = list(dec2Bin(2**i))
-    
-#     batch_inputs.append([float(x) for x in bin_input])
-#     batch_targets.append([float(x) for x in bin_target])
+
 
 # Convert lists to PyTorch tensors
 batch_inputs = torch.tensor(batch_inputs, dtype=torch.float32).to(device) 
 batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device) 
 
 model = torch.nn.Sequential(
-    LogicLayer(8, 8, 0),
     LogicLayer(8, 8),
+    LogicLayer(8, 8, 1),
     LogicLayer(8, 8),
     LogicLayer(8, 8)
 ).to(device)
 
-
+# model.load_state_dict(torch.load("logic_model.pth", map_location=device))
 # Optimizer and loss
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
-
-# def apply_entropy(param, ):
-#     def hook(grad, p=param):
-#         if p.shape[0] == 16:
-#             probs = torch.softmax(param,  dim=0)
-#         else:
-#             probs = torch.softmax(param,  dim=1)
-#         entropy = 1 - torch.mean(probs * torch.log(probs)) * grad.shape[0] * 0.00
-#         return grad * entropy
-#     param.register_hook(hook)
-    
-# for param in model.parameters():
-#     if param.requires_grad:
-#         apply_entropy(param)
-
-criterion = BinaryToDecimalMSELoss()
+criterion = nn.MSELoss()
 
 error_over_time = []
 # Training loop
@@ -372,10 +343,10 @@ for epoch in range(epochs):
                     # Apply multiplier to weights
                     # Broadcast: multiplier shape must match input_dim
                     m = layer.multiplier 
-                    layer.input_A_weights.data = torch.clamp(layer.input_A_weights.data + m, -1, 5)
-                    layer.input_B_weights.data = torch.clamp(layer.input_B_weights.data + m, -1, 5)
+                    layer.input_A_weights.data = torch.clamp(layer.input_A_weights.data + m, -2, 5)
+                    layer.input_B_weights.data = torch.clamp(layer.input_B_weights.data + m, -2, 5)
                     
-                    # layer.table_weights.data = torch.clamp(layer.table_weights.data, -1, 5)
+                    # layer.table_weights.data = torch.clamp(layer.table_weights.data, -1, 10)
         optimizer.step()
 
         error_over_time.append(loss.item())
@@ -388,7 +359,7 @@ for epoch in range(epochs):
             # param1 = F.softmax(param1.data, dim=1)
             # param2 = F.softmax(param2.data, dim=1)
             # for i in range(len(param1)):
-            #     tableOperatorOverTime[i].append(float(param1[i][4]) + float(param2[i][4]))
+            #     tableOperatorOverTime[i].append(float(param1[i][5]) + float(param2[i][5]))
             for i in range(len(model[0].multiplier)):
                 tableOperatorOverTime[i].append(float(model[0].multiplier[i]))
         except:
@@ -409,7 +380,6 @@ for epoch in range(epochs):
 
     #     error_over_time.append(loss.item())
     print(f"Epoch {epoch+1}: Last Batch Loss = {loss.item():.6f}")
-
 
 # print(output_grads)
 # batch_inputs = []
@@ -435,6 +405,8 @@ torch.set_printoptions(precision=2, sci_mode=False)
 print(f"\nFinal Loss: {final_loss:.6f}")
 print(batch_targets[:5])
 print("Sample Output:\n", output.T)
+# Save model state
+torch.save(model.state_dict(), "logic_model.pth")
 
 # name, param = list(model.named_parameters())[0]
 # print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
@@ -459,7 +431,7 @@ for name, param in model.named_parameters():
     elif "table" in name:
         print(f"const TABLE_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist() }")
     i += 1
-
+# quit()
 X = np.arange(-2, 2, 0.1)
 Y = np.arange(-2, 2, 0.1)
 X, Y = np.meshgrid(X, Y)
