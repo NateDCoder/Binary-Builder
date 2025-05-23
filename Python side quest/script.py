@@ -12,6 +12,8 @@ import math
 import numpy as np
 import json
 
+from edited_adam import NathanAdam
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
@@ -105,7 +107,7 @@ def dec2Bin(dec):
     bin = (8 - len(bin)) * "0" + bin
     return bin
 
-class GradFactor(torch.autograd.Function):
+class GradNormalizer(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, f = False):
         ctx.f = f
@@ -199,14 +201,9 @@ class LogicLayer(nn.Module):
             
         #     return output
             
-        prev_layer_output = GradFactor.apply(prev_layer_output)
+        prev_layer_output = GradNormalizer.apply(prev_layer_output)
         input_A_weights = self.input_A_weights
         input_B_weights = self.input_B_weights
-        
-        # Softmax for differentiable input selectors
-        input_A_probs = F.softmax(input_A_weights, dim=1)
-        input_B_probs = F.softmax(input_B_weights, dim=1)
-        table_probs = F.softmax(self.table_weights, dim=0)
         
         def forward_multiplier(input_A_weights, input_B_weights, table_weights):
             input_A_probs = F.softmax(input_A_weights, dim=1)
@@ -240,9 +237,6 @@ class LogicLayer(nn.Module):
 
   
         table_probs = F.softmax(self.table_weights, dim=0)
-   
-        input_A_probs = F.softmax(input_A_weights, dim=1)
-        input_B_probs = F.softmax(input_B_weights, dim=1)
         
         if torch.is_grad_enabled():
             multiplier = forward_multiplier(input_A_weights, input_B_weights, self.table_weights)
@@ -251,15 +245,18 @@ class LogicLayer(nn.Module):
                 
             input_A_probs = F.softmax(input_A_weights + multiplier, dim=1)
             input_B_probs = F.softmax(input_B_weights + multiplier, dim=1)
-            
+        else:
+            # Softmax for differentiable input selectors
+            input_A_probs = F.softmax(input_A_weights, dim=1)
+            input_B_probs = F.softmax(input_B_weights, dim=1)
         
          
         
-        a_inputs = GradFactor.apply(torch.matmul(input_A_probs, prev_layer_output))
-        b_inputs = GradFactor.apply(torch.matmul(input_B_probs, prev_layer_output))
+        a_inputs = GradNormalizer.apply(torch.matmul(input_A_probs, prev_layer_output))
+        b_inputs = GradNormalizer.apply(torch.matmul(input_B_probs, prev_layer_output))
 
         table_output = tableOperator(a_inputs, b_inputs)  # shape: [16, batch_size, size]
-        output = GradFactor.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0))  # shape: [batch_size, size]
+        output = GradNormalizer.apply(torch.sum(table_output * table_probs.unsqueeze(-1), dim=0))  # shape: [batch_size, size]
 
         return output
     
@@ -288,21 +285,27 @@ model = torch.nn.Sequential(
 
 # model.load_state_dict(torch.load("logic_model.pth", map_location=device))
 # Optimizer and loss
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
+optimizer = NathanAdam(model.parameters(), lr=0.01, betas=[0.99, 0.999])
 criterion = nn.MSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 1550
+epochs = 450
 
 
-batch_size = len(batch_inputs) // 5  # for 5 batches
+batch_size = len(batch_inputs) // 5 # for 5 batches
 
 output_grads = []
 
 inputAOverTime = []
 inputBOverTime = []
 operatorOverTime = []
+
+average_graidents_over_time = []
+
+for i in range(12):
+    average_graidents_over_time.append([])
+
 for i in range(4):
     
     inputAOverTime.append([[[] for _ in range(8)] for _ in range(8)])
@@ -356,8 +359,10 @@ for _epoch in range(epochs):
                     layer.input_B_weights.data = torch.clamp(layer.input_B_weights.data + m, -2, 5)
                     
                     # layer.table_weights.data = torch.clamp(layer.table_weights.data, -3, 10)
-        optimizer.step()
+        average_gradients = optimizer.step()
 
+        for i in range(len(average_gradients)):
+            average_graidents_over_time[i].append(average_gradients[i])
         error_over_time.append(loss.item())
         
         batch_losses.append((i, loss.item()))
@@ -500,6 +505,11 @@ fig, ax = plt.subplots()
 
 ax.plot(x_values, error_over_time)
 
+fig5, ax5 = plt.subplots()
+for i in range(len(average_graidents_over_time)):
+    ax5.plot(x_values, average_graidents_over_time[i], label=f'Parameter {i}')
+ax5.legend()
+    
 
 with open("tableOperators.json", "w") as f:
     json.dump(operatorOverTime, f)
@@ -513,7 +523,7 @@ for k in range(len(inputAOverTime)):
         line = inputAOverTime[k][i]
         for j in range(len(line)):
             ax3[k][i].plot(range(len(line[j])), line[j], label=f'Line {j}')
-            ax3[k][i].legend(loc='upper right', fontsize=6)
+        ax3[k][i].legend(loc='upper right', fontsize=6)
 fig4, ax4 = plt.subplots(4, 8)
 for k in range(len(operatorOverTime)):
     for i in range(len(operatorOverTime[k])):
