@@ -14,3 +14,14 @@ canvas {
     left: 0;
     right: 0;
 }
+
+#myRange {
+    padding: 5;
+    margin: auto;
+    display: block;
+    position: absolute;
+ 
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+}

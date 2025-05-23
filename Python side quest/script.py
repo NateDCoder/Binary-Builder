@@ -10,6 +10,7 @@ from matplotlib.ticker import LinearLocator
 import math
 
 import numpy as np
+import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -179,7 +180,7 @@ class LogicLayer(nn.Module):
         self.index = index
         
     def forward(self, prev_layer_output):
-        global drop_out_rate
+        global drop_out_rate, epoch
         # if not torch.is_grad_enabled():
         #     a_indices = torch.argmax(self.input_A_weights, dim=1)
         #     b_indices = torch.argmax(self.input_B_weights, dim=1)
@@ -205,13 +206,13 @@ class LogicLayer(nn.Module):
         # Softmax for differentiable input selectors
         input_A_probs = F.softmax(input_A_weights, dim=1)
         input_B_probs = F.softmax(input_B_weights, dim=1)
-        table_probs = apply_probs_dropout(F.softmax(self.table_weights, dim=0), drop_out_rate)
+        table_probs = F.softmax(self.table_weights, dim=0)
         
         def forward_multiplier(input_A_weights, input_B_weights, table_weights):
             input_A_probs = F.softmax(input_A_weights, dim=1)
             input_B_probs = F.softmax(input_B_weights, dim=1)
 
-            table_probs = F.softmax(table_weights, dim=0)  # ignore dropout for deriv
+            table_probs = F.softmax(table_weights, dim=0) 
             a_Zeroes = (1 - (table_probs[0] + table_probs[5] + table_probs[10] + table_probs[15])).unsqueeze(-1)
             b_Zeroes = (1 - (table_probs[0] + table_probs[3] + table_probs[12] + table_probs[15])).unsqueeze(-1)
 
@@ -238,17 +239,18 @@ class LogicLayer(nn.Module):
             return multiplier
 
   
-        table_probs = apply_probs_dropout(F.softmax(self.table_weights, dim=0), drop_out_rate)
+        table_probs = F.softmax(self.table_weights, dim=0)
    
         input_A_probs = F.softmax(input_A_weights, dim=1)
         input_B_probs = F.softmax(input_B_weights, dim=1)
+        
         if torch.is_grad_enabled():
             multiplier = forward_multiplier(input_A_weights, input_B_weights, self.table_weights)
             
             self.multiplier = multiplier
                 
-            input_A_probs = apply_connection_dropout(F.softmax(input_A_weights + multiplier, dim=1), 0)
-            input_B_probs = apply_connection_dropout(F.softmax(input_B_weights + multiplier, dim=1), 0)
+            input_A_probs = F.softmax(input_A_weights + multiplier, dim=1)
+            input_B_probs = F.softmax(input_B_weights + multiplier, dim=1)
             
         
          
@@ -279,7 +281,7 @@ batch_targets = torch.tensor(batch_targets, dtype=torch.float32).to(device)
 
 model = torch.nn.Sequential(
     LogicLayer(8, 8),
-    LogicLayer(8, 8, 1),
+    LogicLayer(8, 8),
     LogicLayer(8, 8),
     LogicLayer(8, 8)
 ).to(device)
@@ -291,19 +293,26 @@ criterion = nn.MSELoss()
 
 error_over_time = []
 # Training loop
-epochs = 2000
+epochs = 1550
 
 
 batch_size = len(batch_inputs) // 5  # for 5 batches
 
 output_grads = []
 
-tableOperatorOverTime = []
-for i in range(8):
-    tableOperatorOverTime.append([])
+inputAOverTime = []
+inputBOverTime = []
+operatorOverTime = []
+for i in range(4):
     
-for epoch in range(epochs):
-    epoch += 1
+    inputAOverTime.append([[[] for _ in range(8)] for _ in range(8)])
+    inputBOverTime.append([[[] for _ in range(8)] for _ in range(8)])
+    operatorOverTime.append([[[] for _ in range(16)] for _ in range(8)])
+print(len(operatorOverTime), len(operatorOverTime[0]), len(operatorOverTime[0][0]))
+epoch = 0  
+for _epoch in range(epochs):
+    
+    epoch = _epoch
     # if epoch % 1000 < 500 and epoch > 2000:
     #     drop_out_rate = 0.15
     # else:
@@ -346,7 +355,7 @@ for epoch in range(epochs):
                     layer.input_A_weights.data = torch.clamp(layer.input_A_weights.data + m, -2, 5)
                     layer.input_B_weights.data = torch.clamp(layer.input_B_weights.data + m, -2, 5)
                     
-                    # layer.table_weights.data = torch.clamp(layer.table_weights.data, -1, 10)
+                    # layer.table_weights.data = torch.clamp(layer.table_weights.data, -3, 10)
         optimizer.step()
 
         error_over_time.append(loss.item())
@@ -354,18 +363,26 @@ for epoch in range(epochs):
         batch_losses.append((i, loss.item()))
         
         try:
-            # _, param1 = list(model.named_parameters())[0]
-            # _, param2 = list(model.named_parameters())[1]
-            # param1 = F.softmax(param1.data, dim=1)
-            # param2 = F.softmax(param2.data, dim=1)
-            # for i in range(len(param1)):
-            #     tableOperatorOverTime[i].append(float(param1[i][5]) + float(param2[i][5]))
-            for i in range(len(model[0].multiplier)):
-                tableOperatorOverTime[i].append(float(model[0].multiplier[i]))
+            for k in range(4):
+                _, param1 = list(model.named_parameters())[k * 3]
+                _, param2 = list(model.named_parameters())[k * 3 + 1]
+                _, param3 = list(model.named_parameters())[k * 3 + 2]
+                param1 = F.softmax(param1.data, dim=1)
+                param2 = F.softmax(param2.data, dim=1)
+                param3 = F.softmax(param3.data, dim=0)
+
+                for j in range(8):
+                    for i in range(len(param1)):
+                        inputAOverTime[k][j][i].append(float(param1[i][j]))
+                        inputBOverTime[k][j][i].append(float(param2[i][j]))
+                    for i in range(len(param3)):
+                        operatorOverTime[k][j][i].append(float(param3[i][j]))  
+            # for i in range(len(model[0].multiplier)):
+            #     tableOperatorOverTime[i].append(float(model[0].multiplier[i]))
         except:
             print("Crashing out")
             for i in range(8):
-                tableOperatorOverTime[i].append(0) 
+                inputAOverTime[i].append(0) 
     # top_n = 1
     # worst_batches_input = batch_inputs[-5:]
     # worst_batches_targets = batch_targets[-5:]
@@ -401,12 +418,19 @@ with torch.no_grad():
     final_loss = criterion(output, batch_targets.T).item()
 
 output = model(batch_inputs.T)
+with torch.autograd.profiler.profile(use_cuda=torch.cuda.is_available()) as prof:
+    output = model(batch_inputs.T)
+    loss = criterion(output, batch_targets.T)
+    loss.backward()
+print(prof.key_averages().table(sort_by="cuda_time_total" if torch.cuda.is_available() else "cpu_time_total"))
+
+
 torch.set_printoptions(precision=2, sci_mode=False)
 print(f"\nFinal Loss: {final_loss:.6f}")
 print(batch_targets[:5])
 print("Sample Output:\n", output.T)
 # Save model state
-torch.save(model.state_dict(), "logic_model.pth")
+# torch.save(model.state_dict(), "logic_model.pth")
 
 # name, param = list(model.named_parameters())[0]
 # print(f"Layer: {name}, Weights: { F.softmax(param.data, dim=1)}")
@@ -431,50 +455,74 @@ for name, param in model.named_parameters():
     elif "table" in name:
         print(f"const TABLE_PROBS_{math.floor(i/3)} = { param.data.cpu().tolist() }")
     i += 1
-# quit()
-X = np.arange(-2, 2, 0.1)
-Y = np.arange(-2, 2, 0.1)
-X, Y = np.meshgrid(X, Y)
-Z = np.zeros_like(X)
 
-for i in range(X.shape[0]):
-    for j in range(X.shape[1]):
-        x = X[i, j]
-        y = Y[i, j]
+# quit()
+# X = np.arange(-2, 2, 0.1)
+# Y = np.arange(-2, 2, 0.1)
+# X, Y = np.meshgrid(X, Y)
+# Z = np.zeros_like(X)
+
+# for i in range(X.shape[0]):
+#     for j in range(X.shape[1]):
+#         x = X[i, j]
+#         y = Y[i, j]
         
-        # Modify model parameters
-        with torch.no_grad():
-            for k, (name, param) in enumerate(model.named_parameters()):
-                param.data = (original[k] + x * direction1[k] + y * direction2[k])
+#         # Modify model parameters
+#         with torch.no_grad():
+#             for k, (name, param) in enumerate(model.named_parameters()):
+#                 param.data = (original[k] + x * direction1[k] + y * direction2[k])
         
-        # Compute loss
-        output = model(batch_inputs.T)
-        loss = criterion(output, batch_targets.T)
-        Z[i, j] = loss.item()
-        if math.isnan(loss.item()):
-            quit()
+#         # Compute loss
+#         output = model(batch_inputs.T)
+#         loss = criterion(output, batch_targets.T)
+#         Z[i, j] = loss.item()
+#         if math.isnan(loss.item()):
+#             quit()
+
 fig2, ax2 = plt.subplots(subplot_kw={"projection": "3d"})
 
 # Plot the surface.
-surf = ax2.plot_surface(X, Y, Z, cmap=cm.coolwarm,
-                       linewidth=0, antialiased=False)
+# surf = ax2.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+#                        linewidth=0, antialiased=False)
 
 # Customize the z axis.
-ax2.set_zlim(np.min(Z), np.max(Z))
-ax2.zaxis.set_major_locator(LinearLocator(10))
-# A StrMethodFormatter is used automatically
-ax2.zaxis.set_major_formatter('{x:.02f}')
+# ax2.set_zlim(np.min(Z), np.max(Z))
+# ax2.zaxis.set_major_locator(LinearLocator(10))
+# # A StrMethodFormatter is used automatically
+# ax2.zaxis.set_major_formatter('{x:.02f}')
 
 # Add a color bar which maps values to colors.
-fig2.colorbar(surf, shrink=0.5, aspect=5)
+# fig2.colorbar(surf, shrink=0.5, aspect=5)
 
 x_values = range(len(error_over_time))
 
 fig, ax = plt.subplots()
 
 ax.plot(x_values, error_over_time)
-for i, value in enumerate(tableOperatorOverTime):
-    ax.plot(range(len(value)), value, label=f'Line {i}')
 
-ax.legend()
+
+with open("tableOperators.json", "w") as f:
+    json.dump(operatorOverTime, f)
+with open("inputA.json", "w") as f:
+    json.dump(inputAOverTime, f)
+with open("inputB.json", "w") as f:
+    json.dump(inputBOverTime, f)
+fig3, ax3 = plt.subplots(4, 8)
+for k in range(len(inputAOverTime)):
+    for i in range(len(inputAOverTime[k])):
+        line = inputAOverTime[k][i]
+        for j in range(len(line)):
+            ax3[k][i].plot(range(len(line[j])), line[j], label=f'Line {j}')
+            ax3[k][i].legend(loc='upper right', fontsize=6)
+fig4, ax4 = plt.subplots(4, 8)
+for k in range(len(operatorOverTime)):
+    for i in range(len(operatorOverTime[k])):
+        line = operatorOverTime[k][i]
+        for j in range(len(line)):
+            ax4[k][i].plot(range(len(line[j])), line[j], label=f'Op {j}')
+            # ax4[k][i].legend(loc='upper right', fontsize=5)
 plt.show()
+
+
+# 66.753ms
+# 63.316ms

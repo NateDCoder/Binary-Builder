@@ -3,36 +3,51 @@ class LogicLayer {
         this.index = index;
         this.size = size;
         this.prev_size = prev_size;
-        input_A_probs = input_A_probs
-        input_B_probs = input_B_probs
+        input_A_probs = input_A_probs;
+        input_B_probs = input_B_probs;
 
         this.input_A_probs = softmax(input_A_probs, 1);
         this.input_B_probs = softmax(input_B_probs, 1);
         this.table_probs = softmax(table_probs, 0);
 
+        const a_Zeroes = oneSubtractFromArray(
+            addArrays(
+                this.table_probs[0],
+                this.table_probs[5],
+                this.table_probs[10],
+                this.table_probs[15]
+            )
+        );
 
-        const a_Zeroes = oneSubtractFromArray(addArrays(this.table_probs[0], this.table_probs[5], this.table_probs[10], this.table_probs[15]));
-
-        const b_Zeroes = oneSubtractFromArray(addArrays(this.table_probs[0], this.table_probs[3], this.table_probs[12], this.table_probs[15]));
+        const b_Zeroes = oneSubtractFromArray(
+            addArrays(
+                this.table_probs[0],
+                this.table_probs[3],
+                this.table_probs[12],
+                this.table_probs[15]
+            )
+        );
         let multiplier = subtract1FromArray(
             divArray(
                 1,
-                arrayClamp(matrixSum(matrixAdd(
-                    arrayMatrixMutliplication(this.input_A_probs, a_Zeroes), 
-                    arrayMatrixMutliplication(this.input_B_probs, b_Zeroes)), 0), 0, 1)
+                arrayClamp(
+                    matrixSum(
+                        matrixAdd(
+                            arrayMatrixMutliplication(this.input_A_probs, a_Zeroes),
+                            arrayMatrixMutliplication(this.input_B_probs, b_Zeroes)
+                        ),
+                        0
+                    ),
+                    0,
+                    1
+                )
             )
         );
-        console.log(multiplier)
+        console.log(multiplier);
         console.log("A Zeroes", a_Zeroes);
-        console.log(this.table_probs)
-        this.input_A_probs = softmax(
-            arrayMatrixAddition(input_A_probs, multiplier),
-            1
-        );
-        this.input_B_probs = softmax(
-            arrayMatrixAddition(input_B_probs, multiplier),
-            1
-        );
+        console.log(this.table_probs);
+        this.input_A_probs = softmax(arrayMatrixAddition(input_A_probs, multiplier), 1);
+        this.input_B_probs = softmax(arrayMatrixAddition(input_B_probs, multiplier), 1);
 
         this.positions = [];
         this.startPositions = [];
@@ -69,37 +84,58 @@ class LogicLayer {
                     this.index == 0
                         ? this.startPositions[i]
                         : nn.layers[this.index - 1].positions[i];
-                if (!(this.table_probs[5][j] > 0.8) && !(this.table_probs[10][j] > 0.8)) {
-                    stroke(
-                        lerpColor(
-                            color(100, this.input_A_probs[j][i] * 255),
-                            color(255, 255, 0, this.input_A_probs[j][i] * 255),
-                            transpose(this.prev_layer_output)[currentIndex][i]
-                        )
-                    );
-                    line(
-                        startPositions.x,
-                        startPositions.y,
-                        this.positions[j].x - 5,
-                        this.positions[j].y - 5
-                    );
-                }
+                stroke(
+                    lerpColor(
+                        color(
+                            100,
+                            this.input_A_probs[j][i] *
+                                255 *
+                                (1 - (this.table_probs[5][j] + this.table_probs[10][j]))
+                        ),
+                        color(
+                            255,
+                            255,
+                            0,
+                            this.input_A_probs[j][i] *
+                                255 *
+                                (1 - (this.table_probs[5][j] + this.table_probs[10][j]))
+                        ),
+                        transpose(this.prev_layer_output)[currentIndex][i]
+                    )
+                );
+                line(
+                    startPositions.x,
+                    startPositions.y,
+                    this.positions[j].x - 5,
+                    this.positions[j].y - 5
+                );
+
                 // B Line
-                if (!(this.table_probs[3][j] > 0.8) && !(this.table_probs[12][j] > 0.8)) {
-                    stroke(
-                        lerpColor(
-                            color(100, this.input_B_probs[j][i] * 255),
-                            color(255, 255, 0, this.input_B_probs[j][i] * 255),
-                            transpose(this.prev_layer_output)[currentIndex][i]
-                        )
-                    );
-                    line(
-                        startPositions.x,
-                        startPositions.y,
-                        this.positions[j].x - 5,
-                        this.positions[j].y + 5
-                    );
-                }
+                stroke(
+                    lerpColor(
+                        color(
+                            100,
+                            this.input_B_probs[j][i] *
+                                255 *
+                                (1 - (this.table_probs[12][j] + this.table_probs[3][j]))
+                        ),
+                        color(
+                            255,
+                            255,
+                            0,
+                            this.input_B_probs[j][i] *
+                                255 *
+                                (1 - (this.table_probs[12][j] + this.table_probs[3][j]))
+                        ),
+                        transpose(this.prev_layer_output)[currentIndex][i]
+                    )
+                );
+                line(
+                    startPositions.x,
+                    startPositions.y,
+                    this.positions[j].x - 5,
+                    this.positions[j].y + 5
+                );
             }
         }
         for (let j = 0; j < this.input_A_probs.length; j++) {

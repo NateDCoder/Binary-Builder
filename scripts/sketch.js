@@ -8,7 +8,7 @@ const menuOptions = ["and", "or", "not", "xor"];
 var sampleLine = null;
 
 var nn;
-function setup() {
+async function setup() {
     let canvas = createCanvas(600, 600);
     canvas.elt.oncontextmenu = () => false;
     number1 = new BinaryDisplay(inputs[currentIndex], 30, height / 2 - 30 * 4);
@@ -23,14 +23,26 @@ function setup() {
         new LogicLayer(8, 8, INPUT_A_PROBS_0, INPUT_B_PROBS_0, TABLE_PROBS_0, 0),
         new LogicLayer(8, 8, INPUT_A_PROBS_1, INPUT_B_PROBS_1, TABLE_PROBS_1, 1),
         new LogicLayer(8, 8, INPUT_A_PROBS_2, INPUT_B_PROBS_2, TABLE_PROBS_2, 2),
-        new LogicLayer(8, 8, INPUT_A_PROBS_3, INPUT_B_PROBS_3, TABLE_PROBS_3, 3)
+        new LogicLayer(8, 8, INPUT_A_PROBS_3, INPUT_B_PROBS_3, TABLE_PROBS_3, 3),
+        // new LogicLayer(8, 8, INPUT_A_PROBS_4, INPUT_B_PROBS_4, TABLE_PROBS_4, 4)
     ]);
     // let sliced = transpose(binaryInputs)
     //     .slice(4, 8)
     //     .map((row) => row.slice(0, 15));
     console.log(transpose(nn.forward(transpose(binaryInputs))));
+    await nn.init();
+    nn.updateTimeStep(7749);
 }
+var slider = document.getElementById("myRange");
+var output = document.getElementById("time-display");
 
+output.innerHTML = slider.value; // Display the default slider value
+
+// Update the current slider value (each time you drag the slider handle)
+slider.oninput = function () {
+    document.getElementById("time-display").innerHTML = this.value;
+    nn.updateTimeStep(int(this.value));
+};
 function draw() {
     background(0);
     number1.show();
