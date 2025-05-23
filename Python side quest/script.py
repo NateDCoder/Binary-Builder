@@ -368,20 +368,38 @@ for _epoch in range(epochs):
         batch_losses.append((i, loss.item()))
         
         try:
-            for k in range(4):
-                _, param1 = list(model.named_parameters())[k * 3]
-                _, param2 = list(model.named_parameters())[k * 3 + 1]
-                _, param3 = list(model.named_parameters())[k * 3 + 2]
-                param1 = F.softmax(param1.data, dim=1)
-                param2 = F.softmax(param2.data, dim=1)
-                param3 = F.softmax(param3.data, dim=0)
+            named_params = list(model.named_parameters())
 
-                for j in range(8):
-                    for i in range(len(param1)):
-                        inputAOverTime[k][j][i].append(float(param1[i][j]))
-                        inputBOverTime[k][j][i].append(float(param2[i][j]))
-                    for i in range(len(param3)):
-                        operatorOverTime[k][j][i].append(float(param3[i][j]))  
+            for k in range(len(model)):
+                _, raw_param1 = named_params[k * 3]
+                _, raw_param2 = named_params[k * 3 + 1]
+                _, raw_param3 = named_params[k * 3 + 2]
+
+                param1 = F.softmax(raw_param1.data, dim=1)
+                param2 = F.softmax(raw_param2.data, dim=1)
+                param3 = F.softmax(raw_param3.data, dim=0)
+
+                # Convert to list-of-lists directly: shape (N, M) → param[i][j]
+                param1_list = param1.tolist()
+                param2_list = param2.tolist()
+
+                for i, row in enumerate(param1_list):
+                    for j, value in enumerate(row):
+                        inputAOverTime[k][j][i].append(value)
+
+                for i, row in enumerate(param2_list):
+                    for j, value in enumerate(row):
+                        inputBOverTime[k][j][i].append(value)
+
+                # Handle param3
+                param3_list = param3.tolist()
+                if param3.dim() == 1:
+                    for i, value in enumerate(param3_list):
+                        operatorOverTime[k][0][i].append(value)
+                else:
+                    for i, row in enumerate(param3_list):
+                        for j, value in enumerate(row):
+                            operatorOverTime[k][j][i].append(value)
             # for i in range(len(model[0].multiplier)):
             #     tableOperatorOverTime[i].append(float(model[0].multiplier[i]))
         except:
